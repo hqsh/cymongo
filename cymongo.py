@@ -132,17 +132,20 @@ class CyMongoCollection(CyMongo):
         data_frame_data = self.mongoc_api.find(self.__mongoc_collection, pointer(self.__data_frame_info), debug)
         if debug:
             print((data_frame_data.contents.row_cnt, data_frame_data.contents.col_cnt))
-        print(type(data_frame_data.contents.row_cnt))
         ctype_index_array = None
         for array_type in self.supported_types:
             ctype_index_array = getattr(data_frame_data.contents, '{}_index_array'.format(array_type))
             if ctype_index_array:
+                if debug:
+                    print('index type is: {}'.format(array_type))
                 break
         ctype_column_array = None
-        # for array_type in self.supported_types:
-        #     ctype_column_array = getattr(data_frame_data.contents, '{}_column_array'.format(array_type))
-        #     if ctype_column_array:
-        #         break
+        for array_type in self.supported_types:
+            ctype_column_array = getattr(data_frame_data.contents, '{}_column_array'.format(array_type))
+            if ctype_column_array:
+                if debug:
+                    print('column type is: {}'.format(array_type))
+                break
         index = np.ctypeslib.as_array(ctype_index_array, shape=(data_frame_data.contents.row_cnt,))
         # column = np.ctypeslib.as_array(ctype_column_array, shape=(data_frame_data.contents.col_cnt,))
         print(index)

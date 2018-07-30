@@ -2,13 +2,18 @@
 
 #define BSON_TYPE_UNKNOWN -1
 
-typedef char * string_t;
 typedef double float64_t;
 typedef bool bool_t;
 
+typedef struct {
+    bson_unichar_t *string;
+    uint64_t length;
+} string_t;
+
 // the data and information of index or columns of DataFrame
 typedef struct _string_index_node_t {
-    char *data;
+    char *data;            // char string
+    string_t uni_string;   // uni string
     struct _string_index_node_t *next;
     uint64_t index;
 } string_index_node_t;
@@ -99,6 +104,8 @@ typedef struct {
 typedef struct {
     void *index_chain_head;
     void *column_chain_head;
+    uint64_t string_index_max_length;     // max length of index strings if index is string type
+    uint64_t string_column_max_length;    // max length of column strings if column is string type
     char **string_value_keys;
     char **int32_value_keys;
     char **int64_value_keys;

@@ -12,31 +12,36 @@
 #define _CREATE_INDEX_NODE(INDEX_NODE_T, CREATE_DATA) \
     INDEX_NODE_T *p_node = (INDEX_NODE_T *) malloc (sizeof (INDEX_NODE_T) ); \
     CREATE_DATA(p_node) \
-    p_node->next = next; \
-    return p_node;
+    p_node->next = next;
 
-string_index_node_t * _create_string_index_node (string_t data, string_index_node_t *next) {
+string_index_node_t * _create_string_index_node (char *data, string_index_node_t *next) {
     _CREATE_INDEX_NODE (string_index_node_t, _CREATE_STR_DATA)
+    return p_node;
 }
 
 int32_index_node_t * _create_int32_index_node (int32_t data, int32_index_node_t *next) {
     _CREATE_INDEX_NODE (int32_index_node_t, _CREATE_NUM_DATA)
+    return p_node;
 }
 
 int64_index_node_t * _create_int64_index_node (int64_t data, int64_index_node_t *next) {
     _CREATE_INDEX_NODE (int64_index_node_t, _CREATE_NUM_DATA)
+    return p_node;
 }
 
 date_time_index_node_t * _create_date_time_index_node (int64_t data, date_time_index_node_t *next) {
     _CREATE_INDEX_NODE (date_time_index_node_t, _CREATE_NUM_DATA)
+    return p_node;
 }
 
 float64_index_node_t * _create_float64_index_node (float64_t data, float64_index_node_t *next) {
     _CREATE_INDEX_NODE (float64_index_node_t, _CREATE_NUM_DATA)
+    return p_node;
 }
 
 bool_index_node_t * _create_bool_index_node (bool_t data, bool_index_node_t *next) {
     _CREATE_INDEX_NODE (bool_index_node_t, _CREATE_NUM_DATA)
+    return p_node;
 }
 
 #define _STR_CMP(S1, S2) \
@@ -62,7 +67,7 @@ bool_index_node_t * _create_bool_index_node (bool_t data, bool_index_node_t *nex
     *prev_node = prev; \
     return false;
 
-bool _find_string_index_node (string_t data, string_index_node_t *chain_head, string_index_node_t **prev_node) {
+bool _find_string_index_node (char *data, string_index_node_t *chain_head, string_index_node_t **prev_node) {
     _FIND_INDEX_NODE (string_index_node_t, _STR_CMP)
 }
 
@@ -86,54 +91,69 @@ bool _find_bool_index_node (bool_t data, bool_index_node_t *chain_head, bool_ind
     _FIND_INDEX_NODE (bool_index_node_t, _NUM_CMP)
 }
 
-#define _INSERT_INDEX_NODE(INDEX_NODE_T, FIND_INDEX_NODE, CREATE_INDEX_NODE) \
+#define _INSERT_INDEX_NODE(INDEX_NODE_T, FIND_INDEX_NODE, CREATE_INDEX_NODE, STRING_LENGTH) \
     chain_head = (INDEX_NODE_T **) chain_head; \
     INDEX_NODE_T *prev_node, *next_node; \
-    if (! FIND_INDEX_NODE (data, *chain_head, &prev_node)) { \
+    if (!FIND_INDEX_NODE (data, *chain_head, &prev_node)) { \
         if (prev_node == NULL) { \
             next_node = *chain_head; \
         } \
         else { \
             next_node = prev_node->next; \
         } \
-        INDEX_NODE_T *node = CREATE_INDEX_NODE (data, next_node); \
+        INDEX_NODE_T *p_new_node = CREATE_INDEX_NODE (data, next_node); \
         if (prev_node == NULL) { \
-            *chain_head = node; \
+            *chain_head = p_new_node; \
         } \
         else { \
-            prev_node->next = node; \
-        } \
-    }
+            prev_node->next = p_new_node; \
+        }
 
-int insert_index_node (bson_type_t type, void *p_data, void **chain_head) {
+int insert_index_node (bson_type_t type, void *p_data, void **chain_head, uint64_t string_length) {
     if ( type == BSON_TYPE_UTF8 ) {
         char *data = (char *) p_data;
-        _INSERT_INDEX_NODE (string_index_node_t, _find_string_index_node, _create_string_index_node)
+        _INSERT_INDEX_NODE (string_index_node_t, _find_string_index_node, _create_string_index_node, string_length)
+//            _CHAR_STRING_TO_UNICHAR_STRING (p_new_node->data, p_new_node->uni_string.string, string_length, p_new_node->uni_string.length)
+            bson_unichar_t __uni_char; \
+            p_new_node->uni_string.string = (bson_unichar_t *) malloc (sizeof (bson_unichar_t) * string_length); \
+            char *__char_string_iter = p_new_node->data; \
+            uint64_t __uni_string_length; \
+            for (__uni_string_length = 0; *__char_string_iter; __char_string_iter = bson_utf8_next_char (__char_string_iter), __uni_string_length++) { \
+                __uni_char = bson_utf8_get_char (__char_string_iter); \
+                p_new_node->uni_string.string[__uni_string_length] = __uni_char; \
+            } \
+            p_new_node->uni_string.length = __uni_string_length;
+        }
     }
     else if ( type == BSON_TYPE_INT32 ) {
         int32_t *_p_data = (int32_t *) p_data;
         int32_t data = *_p_data;
-        _INSERT_INDEX_NODE (int32_index_node_t, _find_int32_index_node, _create_int32_index_node)
+        _INSERT_INDEX_NODE (int32_index_node_t, _find_int32_index_node, _create_int32_index_node, string_length)
+        }
     }
     else if ( type == BSON_TYPE_INT64 ) {
         int64_t *_p_data = (int64_t *) p_data;
         int64_t data = *_p_data;
-        _INSERT_INDEX_NODE (int64_index_node_t, _find_int64_index_node, _create_int64_index_node)
+        _INSERT_INDEX_NODE (int64_index_node_t, _find_int64_index_node, _create_int64_index_node, string_length)
+        }
     }
     else if ( type == BSON_TYPE_DATE_TIME ) {
         int64_t *_p_data = (int64_t *) p_data;
         int64_t data = *_p_data;
-        _INSERT_INDEX_NODE (date_time_index_node_t, _find_date_time_index_node, _create_date_time_index_node)
+        _INSERT_INDEX_NODE (date_time_index_node_t, _find_date_time_index_node, _create_date_time_index_node, string_length)
+        }
     }
     else if ( type == BSON_TYPE_DOUBLE ) {
         float64_t *_p_data = (float64_t *) p_data;
         float64_t data = *_p_data;
-        _INSERT_INDEX_NODE (float64_index_node_t, _find_float64_index_node, _create_float64_index_node)
+        _INSERT_INDEX_NODE (float64_index_node_t, _find_float64_index_node, _create_float64_index_node, string_length)
+        }
     }
     else if ( type == BSON_TYPE_BOOL ) {
         bool_t *_p_data = (bool_t *) p_data;
         bool_t data = *_p_data;
-        _INSERT_INDEX_NODE (bool_index_node_t, _find_bool_index_node, _create_bool_index_node)
+        _INSERT_INDEX_NODE (bool_index_node_t, _find_bool_index_node, _create_bool_index_node, string_length)
+        }
     }
     else {
         return UNSUPPORTED_TYPE_CODE;
@@ -173,3 +193,114 @@ int set_index_node_index (bson_type_t type, void *chain_head) {
     }
     return node_cnt;
 }
+
+#define _SET_INDEX_CHAIN_HEAD_TYPE(INDEX_NODE_T, CHAIN_HEAD) \
+    if (is_first_doc) { \
+        CHAIN_HEAD = (INDEX_NODE_T *) CHAIN_HEAD; \
+    }
+
+#define _CHAR_STRING_TO_UNICHAR_STRING(CHAR_STRING, UNI_CHAR_STRING, STRING_LENGTH, UNI_STRING_LENGTH) \
+    bson_unichar_t __uni_char; \
+    UNI_CHAR_STRING = (bson_unichar_t *) malloc (sizeof (bson_unichar_t) * STRING_LENGTH); \
+    char *__char_string_iter = CHAR_STRING; \
+    uint64_t __uni_string_length; \
+    for (__uni_string_length = 0; *__char_string_iter; __char_string_iter = bson_utf8_next_char (__char_string_iter), __uni_string_length++) { \
+        __uni_char = bson_utf8_get_char (__char_string_iter); \
+        UNI_CHAR_STRING[__uni_string_length] = __uni_char; \
+        printf ("The numberic value is %u %u. Char is %s.\n", (unsigned) UNICHAR_STRING[__uni_string_length], (unsigned) __uni_char, __char_string_iter); \
+    } \
+    printf ("__uni_string_length %d\n", __uni_string_length); \
+    int i; \
+    for (i = 0; i < STRING_LENGTH; i++) \
+        printf("%u | ", (unsigned) UNICHAR_STRING[i]); \
+    printf("\n"); \
+    UNI_STRING_LENGTH = __uni_string_length;
+
+#define _PROCESS_INDEX_OR_COLUMN(TYPE, ITER, KEY, CHAIN_HEAD, MAX_STRING_LENGTH) \
+    if (data_frame_info->TYPE == BSON_TYPE_UNKNOWN) { \
+        data_frame_info->TYPE = bson_iter_type(&ITER); \
+    } \
+    if (data_frame_info->TYPE == BSON_TYPE_UTF8) { \
+        string_data = bson_iter_utf8 (&ITER, &length); \
+        if (debug) \
+            printf ("%s : %s [BSON_TYPE_UTF8 %d] length = %d\n", data_frame_info->KEY, string_data, BSON_TYPE_UTF8, length); \
+        if (length > MAX_STRING_LENGTH) { \
+            MAX_STRING_LENGTH = length; \
+        } \
+        _SET_INDEX_CHAIN_HEAD_TYPE (string_index_node_t, CHAIN_HEAD) \
+        insert_index_node (BSON_TYPE_UTF8, string_data, &CHAIN_HEAD, length); \
+    } \
+    else if (data_frame_info->TYPE == BSON_TYPE_INT32) { \
+        int32_data = bson_iter_int32 (&ITER); \
+        if (debug) \
+            printf ("%s : %d [BSON_TYPE_INT32 %d]\n", data_frame_info->KEY, int32_data, BSON_TYPE_INT32); \
+        _SET_INDEX_CHAIN_HEAD_TYPE (int32_index_node_t, CHAIN_HEAD) \
+        insert_index_node (BSON_TYPE_INT32, &int32_data, &CHAIN_HEAD, 0); \
+    } \
+    else if (data_frame_info->TYPE == BSON_TYPE_INT64) { \
+        int64_data = bson_iter_int64 (&ITER); \
+        if (debug) \
+            printf ("%s : %ld [BSON_TYPE_INT64 %d]\n", data_frame_info->KEY, int64_data, BSON_TYPE_INT64); \
+        _SET_INDEX_CHAIN_HEAD_TYPE (int64_index_node_t, CHAIN_HEAD) \
+        insert_index_node (BSON_TYPE_INT64, &int64_data, &CHAIN_HEAD, 0); \
+    } \
+    else if (data_frame_info->TYPE == BSON_TYPE_DOUBLE) { \
+        float64_data = bson_iter_double (&ITER); \
+        if (debug) \
+            printf ("%s : %lf [BSON_TYPE_DOUBLE %d]\n", data_frame_info->KEY, float64_data, BSON_TYPE_DOUBLE); \
+        _SET_INDEX_CHAIN_HEAD_TYPE (float64_index_node_t, CHAIN_HEAD) \
+        insert_index_node (BSON_TYPE_DOUBLE, &float64_data, &CHAIN_HEAD, 0); \
+    } \
+    else if (data_frame_info->TYPE == BSON_TYPE_BOOL) { \
+        bool_data = bson_iter_bool (&ITER); \
+        if (debug) \
+            printf ("%s : %d [BSON_TYPE_BOOL %d]\n", data_frame_info->KEY, bool_data, BSON_TYPE_BOOL); \
+        _SET_INDEX_CHAIN_HEAD_TYPE (bool_index_node_t, CHAIN_HEAD) \
+        insert_index_node (BSON_TYPE_BOOL, &bool_data, &CHAIN_HEAD, 0); \
+    } \
+    else if (data_frame_info->TYPE == BSON_TYPE_DATE_TIME) { \
+        int64_data = bson_iter_date_time (&ITER); \
+        if (debug) \
+            printf ("%s : %ld [BSON_TYPE_DATE_TIME %d]\n", data_frame_info->KEY, int64_data, BSON_TYPE_DATE_TIME); \
+        _SET_INDEX_CHAIN_HEAD_TYPE (int64_index_node_t, CHAIN_HEAD) \
+        insert_index_node (BSON_TYPE_DATE_TIME, &int64_data, &CHAIN_HEAD, 0); \
+    }
+
+#define _CREATE_INDEX_OR_COLUMN_NUM_ARRAY(CHAIN_HEAD, CNT, TYPE, INDEX_NODE_T) \
+    TYPE *array = (TYPE *) malloc (sizeof(TYPE) * CNT); \
+    INDEX_NODE_T *p_node; \
+    uint64_t i; \
+    for (p_node = CHAIN_HEAD, i = 0; p_node != NULL; p_node = p_node->next, i++) { \
+        array[i] = p_node->data; \
+    }
+
+#define _CREATE_INDEX_OR_COLUMN_ARRAY(BSON_TYPE, CHAIN_HEAD, CNT, MAX_STRING_LENGTH, STRING_ARRAY, INT32_ARRAY, INT64_ARRAY, DATE_TIME_ARRAY, FLOAT64_ARRAY, BOOL_ARRAY) \
+    if (BSON_TYPE == BSON_TYPE_UTF8) { \
+        char *array = (char *) malloc (sizeof(char) * (MAX_STRING_LENGTH + 1) * CNT); \
+        string_index_node_t *p_node; \
+        uint64_t i; \
+        for (p_node = CHAIN_HEAD, i = 0; p_node != NULL; p_node = p_node->next, i++) { \
+            strcpy (array + (i * (MAX_STRING_LENGTH + 1)), p_node->data); \
+        } \
+        STRING_ARRAY = (bson_unichar_t *) array; \
+    } \
+    else if (BSON_TYPE == BSON_TYPE_INT32) { \
+        _CREATE_INDEX_OR_COLUMN_NUM_ARRAY(CHAIN_HEAD, CNT, int32_t, int32_index_node_t) \
+        INT32_ARRAY = array; \
+    } \
+    else if (BSON_TYPE == BSON_TYPE_INT64) { \
+        _CREATE_INDEX_OR_COLUMN_NUM_ARRAY(CHAIN_HEAD, CNT, int64_t, int64_index_node_t) \
+        INT64_ARRAY = array; \
+    } \
+    else if (BSON_TYPE == BSON_TYPE_DATE_TIME) { \
+        _CREATE_INDEX_OR_COLUMN_NUM_ARRAY(CHAIN_HEAD, CNT, int64_t, date_time_index_node_t) \
+        DATE_TIME_ARRAY = array; \
+    } \
+    else if (BSON_TYPE == BSON_TYPE_DOUBLE) { \
+        _CREATE_INDEX_OR_COLUMN_NUM_ARRAY(CHAIN_HEAD, CNT, float64_t, float64_index_node_t) \
+        FLOAT64_ARRAY = array; \
+    } \
+    else if (BSON_TYPE == BSON_TYPE_BOOL) { \
+        _CREATE_INDEX_OR_COLUMN_NUM_ARRAY(CHAIN_HEAD, CNT, bool_t, bool_index_node_t) \
+        BOOL_ARRAY = array; \
+    }
