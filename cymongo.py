@@ -2,10 +2,6 @@ from mongoc_api_define import *
 import numpy as np
 
 
-class CyMongoException(Exception):
-    pass
-
-
 class CyMongo:
     mongoc_api = cdll.LoadLibrary("./mongoc_api.so")
     mongoc_api.get_client.restype = POINTER(c_void_p)
@@ -104,15 +100,27 @@ class CyMongoCollection(CyMongo):
         self.__collection_name = self.to_bytes(collection_name, 'collection_name')
         self.__mongoc_collection = self.mongoc_api.get_collection(self.__mongoc_client, self.__db_name,
                                                                   self.__collection_name)
+        self.__index_key = None
+        self.__column_key = None
+        self.__value_keys = None
         self.__data_frame_info = None
+        self.__debug = False
+
+    def enable_debug(self):
+        self.__debug = True
+
+    def disable_debug(self):
+        self.__debug = False
 
     def set_data_frame_info(self, index_key, column_key, value_keys):
-        value_keys = np.array(list(value_keys))
+        self.__index_key = index_key
+        self.__column_key = column_key
+        self.__value_keys = list(value_keys)
         index_key = self.to_bytes(index_key, 'index_key', accept_none=True)
         column_key = self.to_bytes(column_key, 'column_key', accept_none=True)
         byte_value_keys = []
         value_types = []
-        for value_key in value_keys:
+        for value_key in self.__value_keys:
             byte_value_keys.append(self.to_bytes(value_key, 'element of value_keys'))
             value_types.append(c_int(BSON_TYPE_UNKNOWN))
         value_cnt = len(byte_value_keys)
@@ -128,25 +136,25 @@ class CyMongoCollection(CyMongo):
             c_uint(value_cnt)
         )
 
-    def find(self, filter=None, debug=False):
-        data_frame_data = self.mongoc_api.find(self.__mongoc_collection, pointer(self.__data_frame_info), debug)
-        if debug:
-            print((data_frame_data.contents.row_cnt, data_frame_data.contents.col_cnt))
-        ctype_index_array = None
+    def __get_index_or_column(self, data_frame_data, index_or_column):
         for array_type in self.supported_types:
-            ctype_index_array = getattr(data_frame_data.contents, '{}_index_array'.format(array_type))
-            if ctype_index_array:
-                if debug:
-                    print('index type is: {}'.format(array_type))
-                break
-        ctype_column_array = None
-        for array_type in self.supported_types:
-            ctype_column_array = getattr(data_frame_data.contents, '{}_column_array'.format(array_type))
-            if ctype_column_array:
-                if debug:
-                    print('column type is: {}'.format(array_type))
-                break
-        index = np.ctypeslib.as_array(ctype_index_array, shape=(data_frame_data.contents.row_cnt,))
-        # column = np.ctypeslib.as_array(ctype_column_array, shape=(data_frame_data.contents.col_cnt,))
-        print(index)
-        # print(column)
+            ctype_array = getattr(data_frame_data.contents, '{}_{}_array'.format(array_type, index_or_column))
+            if ctype_array:
+                if array_type == 'string':
+                    str_len = getattr(data_frame_data.contents, 'string_{}_max_length'.format(index_or_column))
+                    numpy_array = np.ctypeslib.as_array(ctype_array, shape=(data_frame_data.contents.col_cnt, str_len))
+                    numpy_array.dtype = 'U{}'.format(str_len)
+                    return numpy_array
+                return np.ctypeslib.as_array(ctype_array, shape=(data_frame_data.contents.row_cnt,))
+
+    def find(self, filter=None):
+        data_frame_data = self.mongoc_api.find(self.__mongoc_collection, pointer(self.__data_frame_info), self.__debug)
+        index = self.__get_index_or_column(data_frame_data, 'index')
+        column = self.__get_index_or_column(data_frame_data, 'column')
+        print('----------------------------------------------------')
+        print(index, type(index))
+        print(column, type(column))
+
+
+class CyMongoException(Exception):
+    pass
