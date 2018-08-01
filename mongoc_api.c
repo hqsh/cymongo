@@ -1,4 +1,9 @@
-#include "cymongo_utils.c"
+#include "mongoc_util/init_data_structure.c"
+#include "mongoc_util/process_index_column_chain.c"
+#include "mongoc_util/process_value_chain.c"
+#include "mongoc_util/create_index_column_array.c"
+#include "mongoc_util/create_value_array.c"
+#include "mongoc_util/debug_print.c"
 
 mongoc_client_t * get_client (const char *mongoc_uri, int *error_code)
 {
@@ -33,10 +38,12 @@ mongoc_collection_t * get_collection (mongoc_client_t *client, const char *db_na
 
 data_frame_data_t * find (mongoc_collection_t *collection, data_frame_info_t *data_frame_info, bool debug)
 {
+    // mongodb variable
     mongoc_cursor_t *cursor;
     const bson_t *doc;
     bson_t *query;
     bson_iter_t index_iter, column_iter, value_iter;
+    // temporary variable
     char *string_data;
     int32_t int32_data;
     int64_t int64_data;
@@ -44,44 +51,23 @@ data_frame_data_t * find (mongoc_collection_t *collection, data_frame_info_t *da
     bool_t bool_data;
     uint32_t length;
     uint64_t uni_string_length;
+    uint64_t *p_index_idx, *p_column_idx;
     unsigned int i;
+    // whether the document is the first document
     bool is_first_doc = true;
-    mongo_data_t *p_mongo_data = (mongo_data_t *) malloc (sizeof (mongo_data_t));
-    p_mongo_data->index_chain_head = NULL;
-    p_mongo_data->column_chain_head = NULL;
-    p_mongo_data->string_index_max_length = 0;
-    p_mongo_data->string_column_max_length = 0;
-    p_mongo_data->string_value_key_index = NULL;
-    p_mongo_data->int32_value_key_index = NULL;
-    p_mongo_data->int64_value_key_index = NULL;
-    p_mongo_data->date_time_value_key_index = NULL;
-    p_mongo_data->float64_value_key_index = NULL;
-    p_mongo_data->bool_value_key_index = NULL;
-    p_mongo_data->string_value_cnt = 0;
-    p_mongo_data->int32_value_cnt = 0;
-    p_mongo_data->int64_value_cnt = 0;
-    p_mongo_data->date_time_value_cnt = 0;
-    p_mongo_data->float64_value_cnt = 0;
-    p_mongo_data->bool_value_cnt = 0;
-    data_frame_data_t *p_data_frame_data = (data_frame_data_t *) malloc (sizeof (data_frame_data_t));
-    p_data_frame_data->string_index_array = NULL;
-    p_data_frame_data->int32_index_array = NULL;
-    p_data_frame_data->int64_index_array = NULL;
-    p_data_frame_data->date_time_index_array = NULL;
-    p_data_frame_data->float64_index_array = NULL;
-    p_data_frame_data->bool_index_array = NULL;
-    p_data_frame_data->string_column_array = NULL;
-    p_data_frame_data->int32_column_array = NULL;
-    p_data_frame_data->int64_column_array = NULL;
-    p_data_frame_data->date_time_column_array = NULL;
-    p_data_frame_data->float64_column_array = NULL;
-    p_data_frame_data->bool_column_array = NULL;
+    // mongo_data_t
+    mongo_data_t *p_mongo_data = init_mongo_data (data_frame_info->value_cnt);
+    // data_frame_data_t
+    data_frame_data_t *p_data_frame_data = init_data_frame_data (data_frame_info->value_cnt);
 
     if (debug) {
-        printf ("index: %s %d\ncolumn: %s %d\n", data_frame_info->index_key, data_frame_info->index_type,
-            data_frame_info->column_key, data_frame_info->column_type);
-        for (int i = 0; i < data_frame_info->value_cnt; i++) {
-            printf ("%s %d\n", data_frame_info->value_keys[i], data_frame_info->value_types[i]);
+        printf ("the index of DataFrame: %s %d\nthe column of DataFrame: %s %d\n", data_frame_info->index_key,
+            data_frame_info->index_type, data_frame_info->column_key, data_frame_info->column_type);
+        printf ("the values of DataFrame:\n");
+    }
+    for (unsigned int value_idx = 0; value_idx < data_frame_info->value_cnt; value_idx++) {
+        if (debug) {
+            printf ("%s %d\n", data_frame_info->value_keys[value_idx], data_frame_info->value_types[value_idx]);
         }
     }
 
@@ -90,18 +76,9 @@ data_frame_data_t * find (mongoc_collection_t *collection, data_frame_info_t *da
     while (mongoc_cursor_next (cursor, &doc)) {
         if (bson_iter_init (&index_iter, doc) && bson_iter_find (&index_iter, data_frame_info->index_key) &&
                 bson_iter_init (&column_iter, doc) && bson_iter_find (&column_iter, data_frame_info->column_key)) {
-            _PROCESS_INDEX_OR_COLUMN (index_type, index_iter, index_key, p_mongo_data->index_chain_head, p_mongo_data->string_index_max_length, uni_string_length)
-            _PROCESS_INDEX_OR_COLUMN (column_type, column_iter, column_key, p_mongo_data->column_chain_head, p_mongo_data->string_column_max_length, uni_string_length)
-            for (int i = 0; i < data_frame_info->value_cnt; i++) {
-                if (bson_iter_init (&column_iter, doc) && bson_iter_find (&value_iter, data_frame_info->value_keys[i])) {
-                    if (data_frame_info->value_types[i] == BSON_TYPE_UNKNOWN) {
-                        data_frame_info->value_types[i] = bson_iter_type(&value_iter);
-                        if (data_frame_info->value_types[i] == BSON_TYPE_UTF8) {
-//                            _SET_VALUE_KEY_TYPE (p_mongo_data->string_value_keys)
-                        }
-                    }
-                }
-            }
+            _PROCESS_INDEX_OR_COLUMN (index_type, index_iter, index_key, p_mongo_data->index_chain_head, p_mongo_data->string_index_max_length, uni_string_length, p_index_idx)
+            _PROCESS_INDEX_OR_COLUMN (column_type, column_iter, column_key, p_mongo_data->column_chain_head, p_mongo_data->string_column_max_length, uni_string_length, p_column_idx)
+            _PROCESS_VALUE (data_frame_info, value_iter, p_mongo_data, p_index_idx, p_column_idx, p_data_frame_data->string_value_max_lengths)
             is_first_doc = false;
         }
     }
@@ -122,14 +99,20 @@ data_frame_data_t * find (mongoc_collection_t *collection, data_frame_info_t *da
                                    p_data_frame_data->int64_column_array, p_data_frame_data->date_time_column_array,
                                    p_data_frame_data->float64_column_array, p_data_frame_data->bool_column_array)
 
+    create_value_array (data_frame_info, p_mongo_data, p_data_frame_data);
+
+    if (debug) {
+        print_values_in_chains (data_frame_info, p_mongo_data);
+    }
+
     if (debug) {
         int64_index_node_t *index_node;
         for (index_node = p_mongo_data->index_chain_head; index_node != NULL; index_node = index_node->next) {
-            printf ("%lld %llu\n", index_node->data, index_node->index);
+            printf ("%lld %llu\n", index_node->data, index_node->idx);
         }
         string_index_node_t *column_node;
         for (column_node = p_mongo_data->column_chain_head; column_node != NULL; column_node = column_node->next) {
-            printf ("%s %llu\n", column_node->data, column_node->index);
+            printf ("%s %llu\n", column_node->data, column_node->idx);
         }
     }
     return p_data_frame_data;
