@@ -103,24 +103,6 @@ typedef struct {
     uint64_t string_index_max_length;     // max length of index strings if index is string type
     uint64_t string_column_max_length;    // max length of column strings if column is string type
     // values
-//    char **string_value_keys;    // todo delete
-//    char **int32_value_keys;
-//    char **int64_value_keys;
-//    char **date_time_value_keys;
-//    char **float64_value_keys;
-//    char **bool_value_keys;
-//    unsigned int *string_value_key_index;      // the index of the data_frame_info_t.value_keys ( 0, 1, 2, ... , length(value_cnt)-1 )
-//    unsigned int *int32_value_key_index;
-//    unsigned int *int64_value_key_index;
-//    unsigned int *date_time_value_key_index;
-//    unsigned int *float64_value_key_index;
-//    unsigned int *bool_value_key_index;
-//    unsigned int string_value_cnt;
-//    unsigned int int32_value_cnt;
-//    unsigned int int64_value_cnt;
-//    unsigned int date_time_value_cnt;
-//    unsigned int float64_value_cnt;
-//    unsigned int bool_value_cnt;
     string_value_node_t **string_value_chain_heads;
     int32_value_node_t **int32_value_chain_heads;
     int64_value_node_t **int64_value_chain_heads;
@@ -170,12 +152,12 @@ typedef struct {
     bool_t *bool_column_array;
     // value
     uint64_t *string_value_max_lengths;
-    bson_unichar_t ****string_value_arrays;
-    int32_t ***int32_value_arrays;
-    int64_t ***int64_value_arrays;
-    int64_t ***date_time_value_arrays;
-    float64_t ***float64_value_arrays;
-    bool_t ***bool_value_arrays;
+    bson_unichar_t **string_value_arrays;
+    int32_t **int32_value_arrays;
+    int64_t **int64_value_arrays;
+    int64_t **date_time_value_arrays;
+    float64_t **float64_value_arrays;
+    bool_t **bool_value_arrays;
 } data_frame_data_t;
 // -------------------------------- [end] data structure to python [end] --------------------------------
 

@@ -60,4 +60,10 @@ class DataFrameData(Structure):
         ('date_time_column_array', POINTER(c_int64)),
         ('float64_column_array', POINTER(c_double)),
         ('bool_column_array', POINTER(c_bool)),
+        ('string_value_max_lengths', POINTER(c_uint64)),
+        ('string_value_arrays', POINTER(POINTER(c_uint32))),
+        ('int64_value_arrays', POINTER(POINTER(c_int64))),
+        ('date_time_value_arrays', POINTER(POINTER(c_int64))),
+        ('float64_value_arrays', POINTER(POINTER(c_double))),
+        ('bool_value_arrays', POINTER(POINTER(c_bool)))
     ]
