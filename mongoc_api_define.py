@@ -1,4 +1,5 @@
 from ctypes import *
+import ctypes
 
 ILLEGAL_MONGOC_URI_ERROR_CODE = -1         # illegal mongo uri
 CREATE_CLIENT_INSTANCE_ERROR_CODE = -2    # create client instance failed

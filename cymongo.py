@@ -92,7 +92,12 @@ class CyMongoDatabase(CyMongo):
 
 
 class CyMongoCollection(CyMongo):
-    supported_types = ('string', 'date_time', 'int32', 'int64', 'float64', 'bool')
+    __supported_types = ('string', 'date_time', 'int32', 'int64', 'float64', 'bool')
+    __supported_bson_types = (BSON_TYPE_UTF8, BSON_TYPE_DATE_TIME, BSON_TYPE_INT32,
+                              BSON_TYPE_INT64, BSON_TYPE_DOUBLE, BSON_TYPE_BOOL)
+    __supported_bson_types_to_types = {bson_type: _type
+                                       for bson_type, _type in zip(__supported_bson_types, __supported_types)}
+    __sys_addr_byte_cnt = 8
 
     def __init__(self, mongoc_client, db_name, collection_name):
         self.__mongoc_client = mongoc_client
@@ -105,6 +110,10 @@ class CyMongoCollection(CyMongo):
         self.__value_keys = None
         self.__data_frame_info = None
         self.__debug = False
+
+    @classmethod
+    def bson_type_to_type(cls, bson_type):
+        return cls.__supported_bson_types_to_types.get(bson_type)
 
     def enable_debug(self):
         self.__debug = True
@@ -137,7 +146,7 @@ class CyMongoCollection(CyMongo):
         )
 
     def __get_index_or_column(self, data_frame_data, index_or_column):
-        for array_type in self.supported_types:
+        for array_type in self.__supported_types:
             ctype_array = getattr(data_frame_data.contents, '{}_{}_array'.format(array_type, index_or_column))
             if ctype_array:
                 if array_type == 'string':
@@ -147,6 +156,17 @@ class CyMongoCollection(CyMongo):
                     return numpy_array
                 return np.ctypeslib.as_array(ctype_array, shape=(data_frame_data.contents.row_cnt,))
 
+    def __get_values(self, data_frame_data):
+        for value_idx, value_key in enumerate(self.__value_keys):
+            print(value_idx, value_key, self.__data_frame_info.value_types[value_idx])
+            array_type = self.bson_type_to_type(self.__data_frame_info.value_types[value_idx])
+            print(array_type)
+            if array_type == 'string':
+                ctype_arrays = getattr(data_frame_data.contents, '{}_value_arrays'.format(array_type))
+                offset = value_idx * self.__sys_addr_byte_cnt
+                ctype_array = cast(c_void_p(cast(ctype_arrays, c_void_p).value + offset), type(ctype_arrays))
+                print(ctype_array.contents.contents)
+
     def find(self, filter=None):
         data_frame_data = self.mongoc_api.find(self.__mongoc_collection, pointer(self.__data_frame_info), self.__debug)
         index = self.__get_index_or_column(data_frame_data, 'index')
@@ -154,6 +174,7 @@ class CyMongoCollection(CyMongo):
         print('----------------------------------------------------')
         print(index, type(index))
         print(column, type(column))
+        self.__get_values(data_frame_data)
 
 
 class CyMongoException(Exception):
