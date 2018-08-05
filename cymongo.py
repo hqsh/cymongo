@@ -2,7 +2,6 @@ from mongoc_api_define import *
 from collections import OrderedDict
 import numpy as np
 import pandas as pd
-import time
 
 
 class CyMongo:
@@ -215,25 +214,21 @@ class CyMongoCollection(CyMongo):
             dtype = self.bson_type_to_type(self.__table_info.column_types[idx])
             c_array = getattr(c_table.contents, '{}_columns'.format(dtype))[idx]
             if c_array:
-                array = np.ctypeslib.as_array(c_array, shape=(c_table.contents.row_cnt, ))
+                if dtype == 'string':
+                    max_length = c_table.contents.string_column_max_lengths[idx]
+                    array = np.ctypeslib.as_array(c_array, shape=(c_table.contents.row_cnt, max_length))
+                    array.dtype = 'U{}'.format(max_length)
+                    array.shape = (array.shape[0], )
+                else:
+                    array = np.ctypeslib.as_array(c_array, shape=(c_table.contents.row_cnt, ))
                 table[self.__column_names[idx]] = array
-            else:
-                print(dtype)
-            # if self.__table_info.column_types[idx] == BSON_TYPE_UTF8:
-            #     pass
-            # elif self.__table_info.column_types[idx] == BSON_TYPE_INT32:
-            #
-            #     array = np.ctypeslib.as_array(c_table.contents.int32_columns[idx], shape=(c_table.contents.row_cnt, 1))
-            #     table[self.__column_names[idx]] = array.tolist()
-            # elif self.__table_info.column_types[idx] == BSON_TYPE_INT64:
-            #     array = np.ctypeslib.as_array(c_table.contents.int64_columns[idx], shape=(c_table.contents.row_cnt, 1))
-            #     table[self.__column_names[idx]] = array.tolist()
         return table
 
     def find_as_data_frame(self, filter=None):
-        begin = time.time()
+        # import time
+        # begin = time.time()
         data_frame_data = self.mongoc_api.find(self.__mongoc_collection, pointer(self.__data_frame_info), self.__debug)
-        print(time.time() - begin)
+        # print(time.time() - begin)
         index = self.__get_index_or_column(data_frame_data, 'index')
         index = pd.Index(index, name=self.__index_key)
         column = self.__get_index_or_column(data_frame_data, 'column')
@@ -242,18 +237,18 @@ class CyMongoCollection(CyMongo):
         dfs = OrderedDict()
         for value_key, value in values.items():
             dfs[value_key] = pd.DataFrame(value, index=index, columns=column)
-        print(time.time() - begin)
+        # print(time.time() - begin)
         return dfs
 
     def find(self, filter=None):
-        begin = time.time()
+        # import time
+        # begin = time.time()
         c_table = self.mongoc_api.find(self.__mongoc_collection, pointer(self.__table_info), self.__debug)
-        print(time.time() - begin)
+        # print(time.time() - begin)
         table = self.__get_table(c_table)
-        print(time.time() - begin)
+        # print(time.time() - begin)
         df = pd.DataFrame(table)
-        print(time.time() - begin)
-        print(df.shape)
+        # print(time.time() - begin)
         return df
 
 

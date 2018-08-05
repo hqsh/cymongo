@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include "cymongo_type.h"
 
 // init mongo_data_t for "find" function
 mongo_data_t * init_mongo_data (unsigned int value_cnt) {

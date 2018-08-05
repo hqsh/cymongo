@@ -1,5 +1,3 @@
-#include "cymongo_type.h"
-
 // todo if use custom (not default) nan value, should transform the value in memory, then use memset
 #define __CREATE_NUMBER_VALUE_ARRAY(TYPE, VALUE_ARRAYS, VALUE_NODE_T, VALUE_CHAIN_HEADS, NAN_VALUE) \
     mem_size = data_frame_size * sizeof(TYPE); \

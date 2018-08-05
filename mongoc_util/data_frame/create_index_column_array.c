@@ -1,5 +1,3 @@
-#include "basic_operation.c"
-
 #define _CREATE_INDEX_OR_COLUMN_NUM_ARRAY(CHAIN_HEAD, CNT, TYPE, INDEX_NODE_T) \
     TYPE *__array = (TYPE *) malloc (sizeof(TYPE) * CNT); \
     INDEX_NODE_T *p_node; \

@@ -1,5 +1,3 @@
-#include "basic_operation.c"
-
 #define _INSERT_VALUE_NODE(VALUE_NODE_T, VALUE_CHAIN_HEAD, CREATE_DATA, DATA, P_INDEX_IDX, P_COLUMN_IDX) \
     VALUE_NODE_T *__p_node = (VALUE_NODE_T *) malloc (sizeof (VALUE_NODE_T) ); \
     CREATE_DATA (__p_node, DATA) \

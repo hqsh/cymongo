@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include "basic_operation.c"
 
 #define _CREATE_INDEX_NODE(INDEX_NODE_T, CREATE_DATA, DATA) \
     INDEX_NODE_T *p_node = (INDEX_NODE_T *) malloc (sizeof (INDEX_NODE_T) ); \
