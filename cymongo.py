@@ -1,5 +1,8 @@
 from mongoc_api_define import *
+from collections import OrderedDict
 import numpy as np
+import pandas as pd
+import time
 
 
 class CyMongo:
@@ -7,7 +10,8 @@ class CyMongo:
     mongoc_api.get_client.restype = POINTER(c_void_p)
     mongoc_api.get_database.restype = POINTER(c_void_p)
     mongoc_api.get_collection.restype = POINTER(c_void_p)
-    mongoc_api.find.restype = POINTER(DataFrameData)
+    mongoc_api.find_as_data_frame.restype = POINTER(DataFrameData)
+    mongoc_api.find.restype = POINTER(Table)
 
     @staticmethod
     def to_bytes(string, name, accept_none=False):
@@ -92,7 +96,8 @@ class CyMongoDatabase(CyMongo):
 
 
 class CyMongoCollection(CyMongo):
-    __supported_types = ('string', 'date_time', 'int32', 'int64', 'float64', 'bool')
+    __supported_number_types = ['date_time', 'int32', 'int64', 'float64', 'bool']
+    __supported_types = ['string'] + __supported_number_types
     __supported_bson_types = (BSON_TYPE_UTF8, BSON_TYPE_DATE_TIME, BSON_TYPE_INT32,
                               BSON_TYPE_INT64, BSON_TYPE_DOUBLE, BSON_TYPE_BOOL)
     __supported_bson_types_to_types = {bson_type: _type
@@ -109,6 +114,8 @@ class CyMongoCollection(CyMongo):
         self.__column_key = None
         self.__value_keys = None
         self.__data_frame_info = None
+        self.__column_names = None
+        self.__table_info = None
         self.__debug = False
 
     @classmethod
@@ -145,6 +152,22 @@ class CyMongoCollection(CyMongo):
             c_uint(value_cnt)
         )
 
+    def set_table_info(self, column_names):
+        self.__column_names = column_names
+        byte_column_names = []
+        column_types = []
+        for column_name in self.__column_names:
+            byte_column_names.append(self.to_bytes(column_name, 'element of column_names'))
+            column_types.append(c_int(BSON_TYPE_UNKNOWN))
+        column_cnt = len(byte_column_names)
+        c_char_p_array = c_char_p * column_cnt
+        c_int_array = c_int * column_cnt
+        self.__table_info = TableInfo(
+            c_char_p_array(*byte_column_names),
+            c_int_array(*column_types),
+            c_uint(column_cnt)
+        )
+
     def __get_index_or_column(self, data_frame_data, index_or_column):
         for array_type in self.__supported_types:
             ctype_array = getattr(data_frame_data.contents, '{}_{}_array'.format(array_type, index_or_column))
@@ -153,28 +176,85 @@ class CyMongoCollection(CyMongo):
                     str_len = getattr(data_frame_data.contents, 'string_{}_max_length'.format(index_or_column))
                     numpy_array = np.ctypeslib.as_array(ctype_array, shape=(data_frame_data.contents.col_cnt, str_len))
                     numpy_array.dtype = 'U{}'.format(str_len)
+                    numpy_array.shape = (numpy_array.shape[0], )
                     return numpy_array
-                return np.ctypeslib.as_array(ctype_array, shape=(data_frame_data.contents.row_cnt,))
+                return np.ctypeslib.as_array(ctype_array, shape=(
+                    getattr(data_frame_data.contents, 'row_cnt' if index_or_column == 'index' else 'col_cnt'), ))
+
+    @classmethod
+    def __get_offset_c_pointer(cls, c_pointer, offset):
+        return cast(c_void_p(cast(c_pointer, c_void_p).value + offset * cls.__sys_addr_byte_cnt), type(c_pointer))
 
     def __get_values(self, data_frame_data):
+        values = OrderedDict()
         for value_idx, value_key in enumerate(self.__value_keys):
-            print(value_idx, value_key, self.__data_frame_info.value_types[value_idx])
+            row_cnt = data_frame_data.contents.row_cnt
+            col_cnt = data_frame_data.contents.col_cnt
             array_type = self.bson_type_to_type(self.__data_frame_info.value_types[value_idx])
-            print(array_type)
+            if array_type is None:
+                continue
+            c_arrays_p_p = getattr(data_frame_data.contents, '{}_value_arrays'.format(array_type))
+            c_array_p = self.__get_offset_c_pointer(c_arrays_p_p, value_idx).contents
             if array_type == 'string':
-                ctype_arrays = getattr(data_frame_data.contents, '{}_value_arrays'.format(array_type))
-                offset = value_idx * self.__sys_addr_byte_cnt
-                ctype_array = cast(c_void_p(cast(ctype_arrays, c_void_p).value + offset), type(ctype_arrays))
-                print(ctype_array.contents.contents)
+                string_max_length = self.__get_offset_c_pointer(
+                    data_frame_data.contents.string_value_max_lengths, value_idx).contents.value
+                value_array = np.ctypeslib.as_array(c_array_p, shape=(row_cnt, col_cnt, string_max_length))
+                value_array.dtype = 'U{}'.format(string_max_length)
+                value_array.shape = (value_array.shape[0], value_array.shape[1])
+                values[value_key] = value_array
+            elif array_type in self.__supported_number_types:
+                value_array = np.ctypeslib.as_array(c_array_p, shape=(row_cnt, col_cnt))
+                values[value_key] = value_array
+            else:
+                raise TypeError('Unknown array_type: {}'.format(array_type))
+        return values
+
+    def __get_table(self, c_table):
+        table = OrderedDict()
+        for idx in range(self.__table_info.column_cnt):
+            dtype = self.bson_type_to_type(self.__table_info.column_types[idx])
+            c_array = getattr(c_table.contents, '{}_columns'.format(dtype))[idx]
+            if c_array:
+                array = np.ctypeslib.as_array(c_array, shape=(c_table.contents.row_cnt, ))
+                table[self.__column_names[idx]] = array
+            else:
+                print(dtype)
+            # if self.__table_info.column_types[idx] == BSON_TYPE_UTF8:
+            #     pass
+            # elif self.__table_info.column_types[idx] == BSON_TYPE_INT32:
+            #
+            #     array = np.ctypeslib.as_array(c_table.contents.int32_columns[idx], shape=(c_table.contents.row_cnt, 1))
+            #     table[self.__column_names[idx]] = array.tolist()
+            # elif self.__table_info.column_types[idx] == BSON_TYPE_INT64:
+            #     array = np.ctypeslib.as_array(c_table.contents.int64_columns[idx], shape=(c_table.contents.row_cnt, 1))
+            #     table[self.__column_names[idx]] = array.tolist()
+        return table
+
+    def find_as_data_frame(self, filter=None):
+        begin = time.time()
+        data_frame_data = self.mongoc_api.find(self.__mongoc_collection, pointer(self.__data_frame_info), self.__debug)
+        print(time.time() - begin)
+        index = self.__get_index_or_column(data_frame_data, 'index')
+        index = pd.Index(index, name=self.__index_key)
+        column = self.__get_index_or_column(data_frame_data, 'column')
+        column = pd.Index(column, name=self.__column_key)
+        values = self.__get_values(data_frame_data)
+        dfs = OrderedDict()
+        for value_key, value in values.items():
+            dfs[value_key] = pd.DataFrame(value, index=index, columns=column)
+        print(time.time() - begin)
+        return dfs
 
     def find(self, filter=None):
-        data_frame_data = self.mongoc_api.find(self.__mongoc_collection, pointer(self.__data_frame_info), self.__debug)
-        index = self.__get_index_or_column(data_frame_data, 'index')
-        column = self.__get_index_or_column(data_frame_data, 'column')
-        print('----------------------------------------------------')
-        print(index, type(index))
-        print(column, type(column))
-        self.__get_values(data_frame_data)
+        begin = time.time()
+        c_table = self.mongoc_api.find(self.__mongoc_collection, pointer(self.__table_info), self.__debug)
+        print(time.time() - begin)
+        table = self.__get_table(c_table)
+        print(time.time() - begin)
+        df = pd.DataFrame(table)
+        print(time.time() - begin)
+        print(df.shape)
+        return df
 
 
 class CyMongoException(Exception):

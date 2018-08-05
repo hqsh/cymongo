@@ -6,6 +6,7 @@
 #define BSON_TYPE_UNKNOWN -1
 
 // basic data types
+typedef int64_t date_time_t;
 typedef double float64_t;
 typedef bool bool_t;
 typedef struct {
@@ -160,5 +161,70 @@ typedef struct {
     bool_t **bool_value_arrays;
 } data_frame_data_t;
 // -------------------------------- [end] data structure to python [end] --------------------------------
+
+
+// ------------------------------- [end] data structure for table [start] -------------------------------
+typedef struct {
+    char **column_names;
+    int *column_types;
+    unsigned int column_cnt;
+} table_info_t;
+
+typedef struct _string_node_t {
+    uint64_t idx;
+    string_t data;
+    struct _string_node_t *next;
+} string_node_t;
+
+typedef struct _int32_node_t {
+    uint64_t idx;
+    int32_t data;
+    struct _int32_node_t *next;
+} int32_node_t;
+
+typedef struct _int64_node_t {
+    uint64_t idx;
+    int64_t data;
+    struct _int64_node_t *next;
+} int64_node_t;
+
+typedef struct _date_time_node_t {
+    uint64_t idx;
+    int64_t data;
+    struct _date_time_node_t *next;
+} date_time_node_t;
+
+typedef struct _float64_node_t {
+    uint64_t idx;
+    float64_t data;
+    struct _float64_node_t *next;
+} float64_node_t;
+
+typedef struct _bool_node_t {
+    uint64_t idx;
+    bool_t data;
+    struct _bool_node_t *next;
+} bool_node_t;
+
+typedef struct {
+    string_node_t **string_node_chain_heads;
+    int32_node_t **int32_node_chain_heads;
+    int64_node_t **int64_node_chain_heads;
+    date_time_node_t **date_time_node_chain_heads;
+    float64_node_t **float64_node_chain_heads;
+    bool_node_t **bool_node_chain_heads;
+} node_chain_heads_t;
+
+typedef struct {
+    uint64_t row_cnt;
+    uint64_t *string_column_max_lengths;
+    bson_unichar_t **string_columns;
+    int32_t **int32_columns;
+    int64_t **int64_columns;
+    int64_t **date_time_columns;
+    float64_t **float64_columns;
+    bool_t **bool_columns;
+} table_t;
+// -------------------------------- [end] data structure for table [end] --------------------------------
 
 #endif

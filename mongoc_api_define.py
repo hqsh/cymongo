@@ -63,8 +63,32 @@ class DataFrameData(Structure):
         ('bool_column_array', POINTER(c_bool)),
         ('string_value_max_lengths', POINTER(c_uint64)),
         ('string_value_arrays', POINTER(POINTER(c_uint32))),
+        ('int32_value_arrays', POINTER(POINTER(c_int32))),
         ('int64_value_arrays', POINTER(POINTER(c_int64))),
         ('date_time_value_arrays', POINTER(POINTER(c_int64))),
         ('float64_value_arrays', POINTER(POINTER(c_double))),
         ('bool_value_arrays', POINTER(POINTER(c_bool)))
+    ]
+
+
+# table_info_t
+class TableInfo(Structure):
+    _fields_ = [
+        ('column_names', POINTER(c_char_p)),
+        ('column_types', POINTER(c_int)),
+        ('column_cnt', c_uint)
+    ]
+
+
+# table_t
+class Table(Structure):
+    _fields_ = [
+        ('row_cnt', c_uint64),
+        ('string_column_max_lengths', POINTER(c_uint64)),
+        ('string_columns', POINTER(POINTER(c_uint32))),
+        ('int32_columns', POINTER(POINTER(c_int32))),
+        ('int64_columns', POINTER(POINTER(c_int64))),
+        ('date_time_columns', POINTER(POINTER(c_int64))),
+        ('float64_columns', POINTER(POINTER(c_double))),
+        ('bool_columns', POINTER(POINTER(c_bool)))
     ]
