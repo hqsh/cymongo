@@ -2,13 +2,15 @@
 #include "mongoc_util/error_code.h"
 #include "mongoc_util/basic_operation.c"
 #include "mongoc_util/data_frame/init_data_structure.c"
-#include "mongoc_util/data_frame/process_index_column_chain.c"
-#include "mongoc_util/data_frame/process_value_chain.c"
-#include "mongoc_util/data_frame/create_index_column_array.c"
-#include "mongoc_util/data_frame/create_value_array.c"
+#include "mongoc_util/data_frame/process_data_frame_data.c"
+#include "mongoc_util/data_frame/create_data_frame_array.c"
+#include "mongoc_util/data_frame/free_data_frame_memory.c"
+//#include "mongoc_util/data_frame/process_value_chain.c"
+//#include "mongoc_util/data_frame/create_index_column_array.c"
+//#include "mongoc_util/data_frame/create_value_array.c"
 #include "mongoc_util/table/process_table_chain.c"
 #include "mongoc_util/table/create_table_array.c"
-#include "mongoc_util/debug_print.c"
+//#include "mongoc_util/debug_print.c"
 #include <time.h>
 
 mongoc_client_t * get_client (const char *mongoc_uri, int *error_code)
@@ -50,10 +52,16 @@ data_frame_data_t * find_as_data_frame (mongoc_collection_t *collection, data_fr
     bson_t *query;
     bson_iter_t index_iter, column_iter, value_iter;
     // temporary variable
-    char *string_data;
+    string_index_t *p_string_index, *p_tmp_string_index;
+    int32_index_t *p_int32_index, *p_tmp_int32_index;
+    int64_index_t *p_int64_index, *p_tmp_int64_index;
+    date_time_index_t *p_date_time_index, *p_tmp_date_time_index;
+    float64_index_t *p_float64_index, *p_tmp_float64_index;
+    bool_index_t *p_bool_index, *p_tmp_bool_index;
+    const char *string_data;
     int32_t int32_data;
     int64_t int64_data;
-    int64_t date_time_data;
+    date_time_t date_time_data;
     float64_t float64_data;
     bool_t bool_data;
     uint32_t length;
@@ -61,16 +69,15 @@ data_frame_data_t * find_as_data_frame (mongoc_collection_t *collection, data_fr
     uint64_t *p_index_idx, *p_column_idx;
     unsigned int i;
     void * p_this_node;
-    // whether the document is the first document
-    bool is_first_doc = true;
-    // mongo_data_t
-    mongo_data_t *p_mongo_data = init_mongo_data (data_frame_info->value_cnt);
-    // data_frame_data_t
-    data_frame_data_t *p_data_frame_data = init_data_frame_data (data_frame_info->value_cnt);
-    time_t start_time, begin_time, begin, time0 = 0, time1 = 0, time2 = 0, time3 = 0, time11 = 0, time12 = 0, time21 = 0, time22 = 0;
     bool b;
+    // init mongo_data_t
+    mongo_data_t *p_mongo_data = init_mongo_data (data_frame_info->value_cnt);
+    // init data_frame_data_t
+    time_t begin_time = clock();
+    data_frame_data_t *p_data_frame_data = init_data_frame_data (data_frame_info->value_cnt);
 
     if (debug) {
+        printf ("find_as_data_frame step 1 [init_data_frame_data], cost: %f\n", (clock() - begin_time) / 1000000.0);
         printf ("the index of DataFrame: %s %d\nthe column of DataFrame: %s %d\n", data_frame_info->index_key,
             data_frame_info->index_type, data_frame_info->column_key, data_frame_info->column_type);
         printf ("the values of DataFrame:\n");
@@ -78,84 +85,73 @@ data_frame_data_t * find_as_data_frame (mongoc_collection_t *collection, data_fr
             printf ("%s %d\n", data_frame_info->value_keys[value_idx], data_frame_info->value_types[value_idx]);
         }
     }
-    begin_time = clock();
 
     query = bson_new ();
     cursor = mongoc_collection_find_with_opts (collection, query, NULL, NULL);
     while (mongoc_cursor_next (cursor, &doc)) {
-        start_time = clock();
         b = bson_iter_init (&index_iter, doc) && bson_iter_find (&index_iter, data_frame_info->index_key) &&
                 bson_iter_init (&column_iter, doc) && bson_iter_find (&column_iter, data_frame_info->column_key);
-        time0 += clock() - start_time;
         if (b) {
-
-            start_time = clock();
-            _PROCESS_INDEX_OR_COLUMN (index_type, index_iter, index_key, p_mongo_data->index_chain_head, p_mongo_data->string_index_max_length, uni_string_length, p_index_idx)
-            time1 += clock() - start_time;
-
-            start_time = clock();
-            _PROCESS_INDEX_OR_COLUMN (column_type, column_iter, column_key, p_mongo_data->column_chain_head, p_mongo_data->string_column_max_length, uni_string_length, p_column_idx)
-            time2 += clock() - start_time;
-
-            start_time = clock();
+            _PROCESS_INDEX_OR_COLUMN (true, index_type, index_iter, p_mongo_data, p_mongo_data->string_index_max_length, p_index_idx)
+            _PROCESS_INDEX_OR_COLUMN (false, column_type, column_iter, p_mongo_data, p_mongo_data->string_column_max_length, p_column_idx)
             _PROCESS_VALUE (data_frame_info, value_iter, p_mongo_data, p_index_idx, p_column_idx, p_data_frame_data->string_value_max_lengths)
-            time3 += clock() - start_time;
-
-            is_first_doc = false;
         }
     }
-    printf ("step 1 : %ld\n", clock() - begin_time);
-    printf ("time 0: %ld\n", time0);
-    printf ("time 1: %ld\n", time1);
-    printf ("time 2: %ld\n", time2);
-    printf ("time 3: %ld\n", time3);
-    printf ("time 11: %ld\n", time11);
-    printf ("time 12: %ld\n", time12);
-    printf ("time 21: %ld\n", time21);
-    printf ("time 22: %ld\n", time22);
+
+    if (debug) {
+        printf ("find_as_data_frame step 2 [process_data_frame_data], cost: %f\n", (clock() - begin_time) / 1000000.0);
+//        printf ("=============================== index ===============================\n");
+//        HASH_ITER (hh, p_mongo_data->date_time_index_head, p_date_time_index, p_tmp_date_time_index) {
+//            printf ("%lld\n", p_date_time_index->data);
+////            HASH_DEL (p_mongo_data->date_time_index_head, p_date_time_index);
+//        }
+//        printf ("============================== columns ==============================\n");
+//        HASH_ITER (hh, p_mongo_data->string_column_head, p_string_index, p_tmp_string_index) {
+//            printf ("columns max string length: %lld\n", p_mongo_data->string_column_max_length);
+//            printf ("%s\tlen = %lld\t", p_string_index->key, p_string_index->data.length);
+//            for (uint64_t i = 0; i < p_string_index->data.length; i++) {
+//                printf ("%u ", p_string_index->data.string[i]);
+//            }
+//            printf ("\n");
+//            //HASH_DEL (p_mongo_data->string_column_head, p_string_index);
+//        }
+    }
 
     bson_destroy (query);
 
-    start_time = clock();
-
-    p_data_frame_data->row_cnt = set_index_node_index (data_frame_info->index_type, p_mongo_data->index_chain_head);
-    p_data_frame_data->col_cnt = set_index_node_index (data_frame_info->column_type, p_mongo_data->column_chain_head);
-    _CREATE_INDEX_OR_COLUMN_ARRAY (data_frame_info->index_type, p_mongo_data->index_chain_head,
+    _CREATE_INDEX_OR_COLUMN_ARRAY (true, data_frame_info->index_type, p_mongo_data,
                                    p_mongo_data->string_index_max_length, p_data_frame_data->row_cnt,
-                                   p_data_frame_data->string_index_max_length,
-                                   p_data_frame_data->string_index_array, p_data_frame_data->int32_index_array,
-                                   p_data_frame_data->int64_index_array, p_data_frame_data->date_time_index_array,
-                                   p_data_frame_data->float64_index_array, p_data_frame_data->bool_index_array)
-    _CREATE_INDEX_OR_COLUMN_ARRAY (data_frame_info->column_type, p_mongo_data->column_chain_head,
+                                   p_data_frame_data->string_index_max_length, p_data_frame_data->string_index_array,
+                                   p_data_frame_data->int32_index_array, p_data_frame_data->int64_index_array,
+                                   p_data_frame_data->date_time_index_array, p_data_frame_data->float64_index_array,
+                                   p_data_frame_data->bool_index_array)
+    if (debug) {
+        printf ("find_as_data_frame step 3 [create_index_array], cost: %f\n", (clock() - begin_time) / 1000000.0);
+    }
+    _CREATE_INDEX_OR_COLUMN_ARRAY (false, data_frame_info->column_type, p_mongo_data,
                                    p_mongo_data->string_column_max_length, p_data_frame_data->col_cnt,
-                                   p_data_frame_data->string_column_max_length,
-                                   p_data_frame_data->string_column_array, p_data_frame_data->int32_column_array,
-                                   p_data_frame_data->int64_column_array, p_data_frame_data->date_time_column_array,
-                                   p_data_frame_data->float64_column_array, p_data_frame_data->bool_column_array)
-
+                                   p_data_frame_data->string_column_max_length, p_data_frame_data->string_column_array,
+                                   p_data_frame_data->int32_column_array, p_data_frame_data->int64_column_array,
+                                   p_data_frame_data->date_time_column_array, p_data_frame_data->float64_column_array,
+                                   p_data_frame_data->bool_column_array)
+    if (debug) {
+        printf ("find_as_data_frame step 4 [create_column_array], cost: %f\n", (clock() - begin_time) / 1000000.0);
+    }
     create_value_array (data_frame_info, p_mongo_data, p_data_frame_data);
-
-    printf ("time 4: %ld\n", clock() - start_time);
-    printf ("total : %ld\n", clock() - begin_time);
-
     if (debug) {
-        print_values_in_chains (data_frame_info, p_mongo_data);
+        printf ("find_as_data_frame step 5 [create_value_array], cost: %f\n", (clock() - begin_time) / 1000000.0);
+    }
+    // free memory
+    free_data_frame_memory (p_mongo_data);
+    if (debug) {
+        printf ("find_as_data_frame step 6 [free_memory], cost: %f\n", (clock() - begin_time) / 1000000.0);
     }
 
-    if (debug) {
-        int64_index_node_t *index_node;
-        for (index_node = p_mongo_data->index_chain_head; index_node != NULL; index_node = index_node->next) {
-            printf ("%lld %llu\n", index_node->data, index_node->idx);
-        }
-        string_index_node_t *column_node;
-        for (column_node = p_mongo_data->column_chain_head; column_node != NULL; column_node = column_node->next) {
-            printf ("%s %llu\n", column_node->data, column_node->idx);
-        }
-    }
     return p_data_frame_data;
 }
 
-table_t * find (mongoc_collection_t *collection, table_info_t *p_table_info, bool debug)
+
+table_t * find_as_table (mongoc_collection_t *collection, table_info_t *p_table_info, bool debug)
 {
     // mongodb variable
     mongoc_cursor_t *cursor;
@@ -172,7 +168,7 @@ table_t * find (mongoc_collection_t *collection, table_info_t *p_table_info, boo
     // temporary variable
     int bson_type;
     uint64_t idx;
-    char *string_data;
+    const char *string_data;
     int32_t int32_data;
     int64_t int64_data;
     int64_t date_time_data;

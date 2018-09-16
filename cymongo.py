@@ -10,7 +10,7 @@ class CyMongo:
     mongoc_api.get_database.restype = POINTER(c_void_p)
     mongoc_api.get_collection.restype = POINTER(c_void_p)
     mongoc_api.find_as_data_frame.restype = POINTER(DataFrameData)
-    mongoc_api.find.restype = POINTER(Table)
+    mongoc_api.find_as_table.restype = POINTER(Table)
 
     @staticmethod
     def to_bytes(string, name, accept_none=False):
@@ -212,6 +212,9 @@ class CyMongoCollection(CyMongo):
         table = OrderedDict()
         for idx in range(self.__table_info.column_cnt):
             dtype = self.bson_type_to_type(self.__table_info.column_types[idx])
+            if dtype is None:
+                raise TypeError('Got unknown column type, maybe the connection to MongoDB lost or the column name is '
+                                'not correct.')
             c_array = getattr(c_table.contents, '{}_columns'.format(dtype))[idx]
             if c_array:
                 if dtype == 'string':
@@ -227,7 +230,8 @@ class CyMongoCollection(CyMongo):
     def find_as_data_frame(self, filter=None):
         # import time
         # begin = time.time()
-        data_frame_data = self.mongoc_api.find(self.__mongoc_collection, pointer(self.__data_frame_info), self.__debug)
+        data_frame_data = self.mongoc_api.find_as_data_frame(
+            self.__mongoc_collection, pointer(self.__data_frame_info), self.__debug)
         # print(time.time() - begin)
         index = self.__get_index_or_column(data_frame_data, 'index')
         index = pd.Index(index, name=self.__index_key)
@@ -240,16 +244,45 @@ class CyMongoCollection(CyMongo):
         # print(time.time() - begin)
         return dfs
 
-    def find(self, filter=None):
-        # import time
-        # begin = time.time()
-        c_table = self.mongoc_api.find(self.__mongoc_collection, pointer(self.__table_info), self.__debug)
-        # print(time.time() - begin)
-        table = self.__get_table(c_table)
-        # print(time.time() - begin)
-        df = pd.DataFrame(table)
-        # print(time.time() - begin)
-        return df
+    def find(self, filter=None, return_type='table'):
+        if self.__debug:
+            import time
+            begin = time.time()
+        if return_type == 'data_frame':
+            data_frame_data = self.mongoc_api.find_as_data_frame(self.__mongoc_collection, pointer(self.__data_frame_info), self.__debug)
+            if self.__debug:
+                print('get_data_from_c cost: {}'.format(time.time() - begin))
+            index = self.__get_index_or_column(data_frame_data, 'index')
+            index = pd.Index(index, name=self.__index_key)
+            if self.__debug:
+                print('get df index cost: {}'.format(time.time() - begin))
+                print(index)
+            column = self.__get_index_or_column(data_frame_data, 'column')
+            column = pd.Index(column, name=self.__column_key)
+            if self.__debug:
+                print('get df column cost: {}'.format(time.time() - begin))
+                print(column)
+            values = self.__get_values(data_frame_data)
+            if self.__debug:
+                print('get df values cost: {}'.format(time.time() - begin))
+            dfs = OrderedDict()
+            for value_key, value in values.items():
+                dfs[value_key] = pd.DataFrame(value, index=index, columns=column)
+            if self.__debug:
+                print('create dfs cost: {}'.format(time.time() - begin))
+            return dfs
+        if return_type == 'table':
+            c_table = self.mongoc_api.find_as_table(self.__mongoc_collection, pointer(self.__table_info), self.__debug)
+            if self.__debug:
+                print('get_data_from_c cost: {}'.format(time.time() - begin))
+            table = self.__get_table(c_table)
+            if self.__debug:
+                print('transfer data into dict cost: {}'.format(time.time() - begin))
+            df = pd.DataFrame(table)
+            if self.__debug:
+                print('create df cost: {}'.format(time.time() - begin))
+            return df
+        raise ValueError('Unknown return_type: {}.'.format(return_type))
 
 
 class CyMongoException(Exception):

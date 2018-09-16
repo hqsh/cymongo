@@ -2,6 +2,7 @@
 #define CYMONGO_TYPE_H
 
 #include <mongoc.h>
+#include "../uthash/uthash.h"
 
 #define BSON_TYPE_UNKNOWN -1
 
@@ -16,42 +17,42 @@ typedef struct {
 
 // ------------------------------ [start] data structure from mongo [start] ------------------------------
 // the data and information of index or columns of DataFrame
-typedef struct _string_index_node_t {
-    char *data;            // char string, for faster strcpy when find node in chain
-    string_t uni_string;   // uni string, for DataFrame string index
-    struct _string_index_node_t *next;
+typedef struct {
+    const char *key;       // char string, hash key, for faster search in hash table
+    UT_hash_handle hh;
+    string_t data;         // uni string, for DataFrame string index
     uint64_t idx;
-} string_index_node_t;
+} string_index_t;
 
-typedef struct _int32_index_node_t {
-    int32_t data;
-    struct _int32_index_node_t *next;
+typedef struct {
+    int32_t data;          // hash key
+    UT_hash_handle hh;
     uint64_t idx;
-} int32_index_node_t;
+} int32_index_t;
 
-typedef struct _int64_index_node_t {
-    int64_t data;
-    struct _int64_index_node_t *next;
+typedef struct {
+    int64_t data;          // hash key
+    UT_hash_handle hh;
     uint64_t idx;
-} int64_index_node_t;
+} int64_index_t;
 
-typedef struct _date_time_index_node_t {
-    int64_t data;
-    struct _date_time_index_node_t *next;
+typedef struct {
+    date_time_t data;      // hash key
+    UT_hash_handle hh;
     uint64_t idx;
-} date_time_index_node_t;
+} date_time_index_t;
 
-typedef struct _float64_index_node_t {
-    float64_t data;
-    struct _float64_index_node_t *next;
+typedef struct {
+    float64_t data;        // hash key
+    UT_hash_handle hh;
     uint64_t idx;
-} float64_index_node_t;
+} float64_index_t;
 
-typedef struct _bool_index_node_t {
-    bool_t data;
-    struct _bool_index_node_t *next;
+typedef struct {
+    bool_t data;           // hash key
+    UT_hash_handle hh;
     uint64_t idx;
-} bool_index_node_t;
+} bool_index_t;
 
 // the data and information of values of DataFrame
 typedef struct _string_value_node_t {
@@ -76,7 +77,7 @@ typedef struct _int64_value_node_t {
 } int64_value_node_t;
 
 typedef struct _date_time_value_node_t {
-    int64_t data;
+    date_time_t data;
     struct _date_time_value_node_t *next;
     uint64_t *p_index_idx;
     uint64_t *p_column_idx;
@@ -98,11 +99,22 @@ typedef struct _bool_value_node_t {
 
 // the data from mongo
 typedef struct {
-    // index or column
-    void *index_chain_head;
-    void *column_chain_head;
+    // index
     uint64_t string_index_max_length;     // max length of index strings if index is string type
+    string_index_t *string_index_head;
+    int32_index_t *int32_index_head;
+    int64_index_t *int64_index_head;
+    date_time_index_t *date_time_index_head;
+    float64_index_t *float64_index_head;
+    bool_index_t *bool_index_head;
+    // column
     uint64_t string_column_max_length;    // max length of column strings if column is string type
+    string_index_t *string_column_head;
+    int32_index_t *int32_column_head;
+    int64_index_t *int64_column_head;
+    date_time_index_t *date_time_column_head;
+    float64_index_t *float64_column_head;
+    bool_index_t *bool_column_head;
     // values
     string_value_node_t **string_value_chain_heads;
     int32_value_node_t **int32_value_chain_heads;
@@ -137,7 +149,7 @@ typedef struct {
     uint64_t col_cnt;
     // index
     uint64_t string_index_max_length;
-    string_t *string_index_array;
+    bson_unichar_t *string_index_array;
     int32_t *int32_index_array;
     int64_t *int64_index_array;
     int64_t *date_time_index_array;
@@ -145,7 +157,7 @@ typedef struct {
     bool_t *bool_index_array;
     // column
     uint64_t string_column_max_length;
-    string_t *string_column_array;
+    bson_unichar_t *string_column_array;
     int32_t *int32_column_array;
     int64_t *int64_column_array;
     int64_t *date_time_column_array;

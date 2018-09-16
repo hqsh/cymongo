@@ -8,7 +8,7 @@
 #define _CHAR_STRING_TO_UNI_CHAR_STRING(CHAR_STRING, UNI_CHAR_STRING, UNI_STRING_LENGTH) \
     bson_unichar_t __uni_char; \
     UNI_CHAR_STRING = (bson_unichar_t *) malloc (sizeof (bson_unichar_t) * strlen(CHAR_STRING)); \
-    char *__char_string_iter = CHAR_STRING; \
+    const char *__char_string_iter = CHAR_STRING; \
     uint64_t __uni_string_length; \
     for (__uni_string_length = 0; *__char_string_iter; __char_string_iter = bson_utf8_next_char (__char_string_iter), __uni_string_length++) { \
         __uni_char = bson_utf8_get_char (__char_string_iter); \
