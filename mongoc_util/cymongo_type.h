@@ -175,7 +175,7 @@ typedef struct {
 // -------------------------------- [end] data structure to python [end] --------------------------------
 
 
-// ------------------------------- [end] data structure for table [start] -------------------------------
+// ------------------------------ [start] data structure for table [start] ------------------------------
 typedef struct {
     char **column_names;
     int *column_types;
