@@ -26,7 +26,6 @@ mongo_data_t * init_mongo_data (unsigned int value_cnt) {
 data_frame_data_t * init_data_frame_data (unsigned int value_cnt) {
     data_frame_data_t *p_data_frame_data = (data_frame_data_t *) malloc (sizeof (data_frame_data_t));
     memset (p_data_frame_data, 0, sizeof(data_frame_data_t));
-
     p_data_frame_data->string_value_max_lengths = (uint64_t *) malloc (sizeof(uint64_t) * value_cnt);
     memset (p_data_frame_data->string_value_max_lengths, 0, sizeof(uint64_t) * value_cnt);
     p_data_frame_data->string_value_arrays = (bson_unichar_t **) malloc (sizeof(bson_unichar_t *) * value_cnt);

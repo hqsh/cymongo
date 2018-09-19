@@ -7,7 +7,7 @@ client = CyMongoClient(mongo_uri)
 # collection = client['test']['cymongo']
 collection = client['test']['cymongo_1000_4000']
 
-return_type = 'table'
+# return_type = 'table'
 return_type = 'data_frame'
 
 collection.enable_debug()
@@ -29,6 +29,7 @@ elif return_type == 'data_frame':
     begin = time.time()
     dfs = collection.find(return_type='data_frame')
     print('find as DataFrames by cymongo cost: {}'.format(time.time() - begin))
-    # for df_name, df in dfs.items():
-    #     print('================================== {} =================================='.format(df_name))
-    #     print(df)
+    for df_name, df in dfs.items():
+        print('================================== {} =================================='.format(df_name))
+        print(df.columns.shape, df.columns.tolist())
+

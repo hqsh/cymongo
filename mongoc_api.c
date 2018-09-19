@@ -2,15 +2,11 @@
 #include "mongoc_util/error_code.h"
 #include "mongoc_util/basic_operation.c"
 #include "mongoc_util/data_frame/init_data_structure.c"
-#include "mongoc_util/data_frame/process_data_frame_data.c"
-#include "mongoc_util/data_frame/create_data_frame_array.c"
-#include "mongoc_util/data_frame/free_data_frame_memory.c"
-//#include "mongoc_util/data_frame/process_value_chain.c"
-//#include "mongoc_util/data_frame/create_index_column_array.c"
-//#include "mongoc_util/data_frame/create_value_array.c"
-#include "mongoc_util/table/process_table_chain.c"
-#include "mongoc_util/table/create_table_array.c"
-//#include "mongoc_util/debug_print.c"
+#include "mongoc_util/data_frame/process_mongo_data.c"
+#include "mongoc_util/data_frame/create_array.c"
+#include "mongoc_util/data_frame/free_memory.c"
+#include "mongoc_util/table/process_mongo_data.c"
+#include "mongoc_util/table/create_array.c"
 #include <time.h>
 
 mongoc_client_t * get_client (const char *mongoc_uri, int *error_code)
@@ -92,14 +88,14 @@ data_frame_data_t * find_as_data_frame (mongoc_collection_t *collection, data_fr
         b = bson_iter_init (&index_iter, doc) && bson_iter_find (&index_iter, data_frame_info->index_key) &&
                 bson_iter_init (&column_iter, doc) && bson_iter_find (&column_iter, data_frame_info->column_key);
         if (b) {
-            _PROCESS_INDEX_OR_COLUMN (true, index_type, index_iter, p_mongo_data, p_mongo_data->string_index_max_length, p_index_idx)
-            _PROCESS_INDEX_OR_COLUMN (false, column_type, column_iter, p_mongo_data, p_mongo_data->string_column_max_length, p_column_idx)
-            _PROCESS_VALUE (data_frame_info, value_iter, p_mongo_data, p_index_idx, p_column_idx, p_data_frame_data->string_value_max_lengths)
+//            _PROCESS_INDEX_OR_COLUMN (true, index_type, index_iter, p_mongo_data, p_mongo_data->string_index_max_length, p_index_idx, p_data_frame_data)
+            _PROCESS_INDEX_OR_COLUMN (false, column_type, column_iter, p_mongo_data, p_mongo_data->string_column_max_length, p_column_idx, p_data_frame_data)
+//            _PROCESS_VALUE (data_frame_info, value_iter, p_mongo_data, p_index_idx, p_column_idx, p_data_frame_data->string_value_max_lengths)
         }
     }
 
     if (debug) {
-        printf ("find_as_data_frame step 2 [process_data_frame_data], cost: %f\n", (clock() - begin_time) / 1000000.0);
+        printf ("find_as_data_frame step 2 [process_mongo_data], cost: %f\n", (clock() - begin_time) / 1000000.0);
 //        printf ("=============================== index ===============================\n");
 //        HASH_ITER (hh, p_mongo_data->date_time_index_head, p_date_time_index, p_tmp_date_time_index) {
 //            printf ("%lld\n", p_date_time_index->data);
@@ -119,6 +115,7 @@ data_frame_data_t * find_as_data_frame (mongoc_collection_t *collection, data_fr
 
     bson_destroy (query);
 
+    printf ("--------------- %llu\n", p_data_frame_data->row_cnt);
     _CREATE_INDEX_OR_COLUMN_ARRAY (true, data_frame_info->index_type, p_mongo_data,
                                    p_mongo_data->string_index_max_length, p_data_frame_data->row_cnt,
                                    p_data_frame_data->string_index_max_length, p_data_frame_data->string_index_array,
@@ -128,6 +125,7 @@ data_frame_data_t * find_as_data_frame (mongoc_collection_t *collection, data_fr
     if (debug) {
         printf ("find_as_data_frame step 3 [create_index_array], cost: %f\n", (clock() - begin_time) / 1000000.0);
     }
+    printf ("--------------- %llu\n", p_data_frame_data->col_cnt);
     _CREATE_INDEX_OR_COLUMN_ARRAY (false, data_frame_info->column_type, p_mongo_data,
                                    p_mongo_data->string_column_max_length, p_data_frame_data->col_cnt,
                                    p_data_frame_data->string_column_max_length, p_data_frame_data->string_column_array,
@@ -142,7 +140,7 @@ data_frame_data_t * find_as_data_frame (mongoc_collection_t *collection, data_fr
         printf ("find_as_data_frame step 5 [create_value_array], cost: %f\n", (clock() - begin_time) / 1000000.0);
     }
     // free memory
-    free_data_frame_memory (p_mongo_data);
+//    free_data_frame_memory (p_mongo_data);
     if (debug) {
         printf ("find_as_data_frame step 6 [free_memory], cost: %f\n", (clock() - begin_time) / 1000000.0);
     }

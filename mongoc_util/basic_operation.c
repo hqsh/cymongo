@@ -27,4 +27,28 @@
 #define _CREATE_NUMBER_DATA(P_NODE, DATA) \
     P_NODE->data = DATA;
 
+int string_index_sort (string_index_t *a, string_index_t *b) {
+    return strcmp(a->key, b->key);
+}
+
+int int32_index_sort (int32_index_t *a, int32_index_t *b) {
+    return (a->data - b->data);
+}
+
+int int64_index_sort (int64_index_t *a, int64_index_t *b) {
+    return (a->data - b->data);
+}
+
+int date_time_index_sort (date_time_index_t *a, date_time_index_t *b) {
+    return (a->data - b->data);
+}
+
+int float64_index_sort (float64_index_t *a, float64_index_t *b) {
+    return (a->data - b->data);
+}
+
+int bool_index_sort (bool_index_t *a, bool_index_t *b) {
+    return (a->data - b->data);
+}
+
 #endif

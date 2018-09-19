@@ -1,26 +1,4 @@
-int string_index_sort (string_index_t *a, string_index_t *b) {
-    return strcmp(a->key, b->key);
-}
-
-int int32_index_sort (int32_index_t *a, int32_index_t *b) {
-    return (a->data - b->data);
-}
-
-int int64_index_sort (int64_index_t *a, int64_index_t *b) {
-    return (a->data - b->data);
-}
-
-int date_time_index_sort (date_time_index_t *a, date_time_index_t *b) {
-    return (a->data - b->data);
-}
-
-int float64_index_sort (float64_index_t *a, float64_index_t *b) {
-    return (a->data - b->data);
-}
-
-int bool_index_sort (bool_index_t *a, bool_index_t *b) {
-    return (a->data - b->data);
-}
+#include "../basic_operation.c"
 
 
 #define _CREATE_INDEX_OR_COLUMN_NUM_ARRAY(ARRAY, HEAD, CNT, TYPE, INDEX_NODE_T, P_INDEX, P_TMP_INDEX, INDEX_SORT_FUNC) \
@@ -106,12 +84,15 @@ int bool_index_sort (bool_index_t *a, bool_index_t *b) {
     p_data_frame_data->VALUE_ARRAYS[value_idx] = (TYPE *) malloc (mem_size); \
     memset (p_data_frame_data->VALUE_ARRAYS[value_idx], NAN_VALUE, mem_size); \
     VALUE_NODE_T *p_node, *p_last_node; \
+    uint64_t cnt = 0; \
     for (p_node = p_mongo_data->VALUE_CHAIN_HEADS[value_idx]; p_node; ) { \
         p_data_frame_data->VALUE_ARRAYS[value_idx][*(p_node->p_index_idx) * col_cnt + *(p_node->p_column_idx)] = p_node->data; \
         p_last_node=p_node; \
         p_node=p_node->next; \
         free(p_last_node); \
-    }
+        cnt++; \
+    } \
+    printf ("cnt : %llu\n", cnt);
 
 
 void create_value_array (data_frame_info_t *p_data_frame_info, mongo_data_t *p_mongo_data, data_frame_data_t *p_data_frame_data) {

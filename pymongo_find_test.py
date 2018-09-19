@@ -4,14 +4,14 @@ import time
 
 client = MongoClient('mongodb://hqs:f@localhost:27017/test')
 db = client['test']
-collection = db['cymongo_1000_4000']
+collection = db['cymongo_4000_4000']
 
-data = {'date_time': [], 'blogger_id': [], 'signature': [], 'daily_visitor_cnt': [], 'fan_cnt': [], 'last_logged_date_time': [], 'heat_degree': [], 'blog_updated': []}
+data = {'date_time': [], 'blogger_id': [], 'daily_visitor_cnt': [], 'fan_cnt': [], 'last_logged_date_time': [], 'heat_degree': [], 'blog_updated': []}  # 'signature': [],
 # data = []
 begin = time.time()
 cur = collection.find({})
 for doc in cur:
-    for value_name in ['date_time', 'blogger_id', 'signature', 'daily_visitor_cnt', 'fan_cnt', 'last_logged_date_time', 'heat_degree', 'blog_updated']:
+    for value_name in ['date_time', 'blogger_id', 'daily_visitor_cnt', 'fan_cnt', 'last_logged_date_time', 'heat_degree', 'blog_updated']:  # 'signature',
     #     x = doc
         data[value_name].append(doc[value_name])
     # data.append(doc)

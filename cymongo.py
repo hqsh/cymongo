@@ -267,6 +267,8 @@ class CyMongoCollection(CyMongo):
                 print('get df values cost: {}'.format(time.time() - begin))
             dfs = OrderedDict()
             for value_key, value in values.items():
+                if value_key == 'blog_updated':
+                    print('---------------', value.size, value.shape, (value == True).sum(), (value == False).sum())
                 dfs[value_key] = pd.DataFrame(value, index=index, columns=column)
             if self.__debug:
                 print('create dfs cost: {}'.format(time.time() - begin))

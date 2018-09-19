@@ -1,18 +1,20 @@
 #include <stdio.h>
 
 
-#define __PROCESS_NUMBER_INDEX_OR_COLUMN(TYPE, INDEX_TYPE, HEAD, P_INDEX, DATA, P_IDX) \
+#define __PROCESS_NUMBER_INDEX_OR_COLUMN(TYPE, INDEX_TYPE, HEAD, P_INDEX, DATA, P_IDX, CNT) \
     HASH_FIND (hh, p_mongo_data->HEAD, &DATA, sizeof(TYPE), P_INDEX); \
     if (!P_INDEX) { \
         P_INDEX = (INDEX_TYPE *) malloc (sizeof(INDEX_TYPE)); \
         memset (P_INDEX, 0, sizeof(INDEX_TYPE)); \
         P_INDEX->data = DATA; \
         HASH_ADD (hh, p_mongo_data->HEAD, data, sizeof(TYPE), P_INDEX); \
+        CNT++; \
     } \
     P_IDX = &(P_INDEX->idx);
 
 
-#define _PROCESS_INDEX_OR_COLUMN(IS_INDEX, TYPE, ITER, P_MONGO_DATA, MAX_STRING_LENGTH, P_IDX) \
+#define _PROCESS_INDEX_OR_COLUMN(IS_INDEX, TYPE, ITER, P_MONGO_DATA, MAX_STRING_LENGTH, P_IDX, P_DATA_FRAME_DATA) \
+    P_IDX = NULL; \
     if (data_frame_info->TYPE == BSON_TYPE_UNKNOWN) { \
         data_frame_info->TYPE = bson_iter_type(&ITER); \
     } \
@@ -21,11 +23,21 @@
         if (MAX_STRING_LENGTH < length) { \
             MAX_STRING_LENGTH = length; \
         } \
+        p_string_index = NULL; \
+        unsigned cnt = HASH_COUNT (P_MONGO_DATA->string_column_head); \
         if (IS_INDEX) { \
             HASH_FIND_STR (P_MONGO_DATA->string_index_head, string_data, p_string_index); \
         } \
         else { \
             HASH_FIND_STR (P_MONGO_DATA->string_column_head, string_data, p_string_index); \
+            if (cnt > 3999) { \
+                sleep(1); \
+                HASH_ITER (hh, P_MONGO_DATA->string_column_head, p_string_index, p_tmp_string_index) { \
+                    printf ("%s  ", p_string_index->key); \
+                } \
+                printf ("\n"); \
+            } \
+            printf ("count = %u\n", cnt); \
         } \
         if (!p_string_index) { \
             p_string_index = (string_index_t *) malloc (sizeof(string_index_t)); \
@@ -33,63 +45,70 @@
             p_string_index->key = string_data; \
             _CHAR_STRING_TO_UNI_CHAR_STRING(string_data, p_string_index->data.string, p_string_index->data.length) \
             if (IS_INDEX) { \
-                HASH_ADD_STR (P_MONGO_DATA->string_index_head, key, p_string_index); \
+                HASH_ADD_KEYPTR (hh, P_MONGO_DATA->string_index_head, p_string_index->key, strlen(p_string_index->key), p_string_index); \
+                P_DATA_FRAME_DATA->row_cnt++; \
             } \
             else { \
-                HASH_ADD_STR (P_MONGO_DATA->string_column_head, key, p_string_index); \
+                HASH_ADD_KEYPTR (hh, P_MONGO_DATA->string_column_head, p_string_index->key, strlen(p_string_index->key), p_string_index); \
+                P_DATA_FRAME_DATA->col_cnt++; \
             } \
+        } \
+        else { \
+            printf ("%s\n", p_string_index->key); \
         } \
         P_IDX = &(p_string_index->idx); \
     } \
     else if (data_frame_info->TYPE == BSON_TYPE_INT32) { \
         int32_data = bson_iter_int32 (&ITER); \
         if (IS_INDEX) { \
-            __PROCESS_NUMBER_INDEX_OR_COLUMN (int32_t, int32_index_t, int32_index_head, p_int32_index, int32_data, P_IDX) \
+            __PROCESS_NUMBER_INDEX_OR_COLUMN (int32_t, int32_index_t, int32_index_head, p_int32_index, int32_data, P_IDX, P_DATA_FRAME_DATA->row_cnt) \
         } \
         else { \
-            __PROCESS_NUMBER_INDEX_OR_COLUMN (int32_t, int32_index_t, int32_column_head, p_int32_index, int32_data, P_IDX) \
+            __PROCESS_NUMBER_INDEX_OR_COLUMN (int32_t, int32_index_t, int32_column_head, p_int32_index, int32_data, P_IDX, P_DATA_FRAME_DATA->col_cnt) \
         } \
     } \
     else if (data_frame_info->TYPE == BSON_TYPE_INT64) { \
         int64_data = bson_iter_int64 (&ITER); \
         if (IS_INDEX) { \
-            __PROCESS_NUMBER_INDEX_OR_COLUMN (int64_t, int64_index_t, int64_index_head, p_int64_index, int64_data, P_IDX) \
+            __PROCESS_NUMBER_INDEX_OR_COLUMN (int64_t, int64_index_t, int64_index_head, p_int64_index, int64_data, P_IDX, P_DATA_FRAME_DATA->row_cnt) \
         } \
         else { \
-            __PROCESS_NUMBER_INDEX_OR_COLUMN (int64_t, int64_index_t, int64_column_head, p_int64_index, int64_data, P_IDX) \
+            __PROCESS_NUMBER_INDEX_OR_COLUMN (int64_t, int64_index_t, int64_column_head, p_int64_index, int64_data, P_IDX, P_DATA_FRAME_DATA->col_cnt) \
         } \
     } \
     else if (data_frame_info->TYPE == BSON_TYPE_DATE_TIME) { \
         date_time_data = bson_iter_date_time (&ITER); \
         if (IS_INDEX) { \
-            __PROCESS_NUMBER_INDEX_OR_COLUMN (date_time_t, date_time_index_t, date_time_index_head, p_date_time_index, date_time_data, P_IDX) \
+            __PROCESS_NUMBER_INDEX_OR_COLUMN (date_time_t, date_time_index_t, date_time_index_head, p_date_time_index, date_time_data, P_IDX, P_DATA_FRAME_DATA->row_cnt) \
         } \
         else { \
-            __PROCESS_NUMBER_INDEX_OR_COLUMN (date_time_t, date_time_index_t, date_time_column_head, p_date_time_index, date_time_data, P_IDX) \
+            __PROCESS_NUMBER_INDEX_OR_COLUMN (date_time_t, date_time_index_t, date_time_column_head, p_date_time_index, date_time_data, P_IDX, P_DATA_FRAME_DATA->col_cnt) \
         } \
     } \
     else if (data_frame_info->TYPE == BSON_TYPE_DOUBLE) { \
         float64_data = bson_iter_double (&ITER); \
         if (IS_INDEX) { \
-            __PROCESS_NUMBER_INDEX_OR_COLUMN (float64_t, float64_index_t, float64_index_head, p_float64_index, float64_data, P_IDX) \
+            __PROCESS_NUMBER_INDEX_OR_COLUMN (float64_t, float64_index_t, float64_index_head, p_float64_index, float64_data, P_IDX, P_DATA_FRAME_DATA->row_cnt) \
         } \
         else { \
-            __PROCESS_NUMBER_INDEX_OR_COLUMN (float64_t, float64_index_t, float64_column_head, p_float64_index, float64_data, P_IDX) \
+            __PROCESS_NUMBER_INDEX_OR_COLUMN (float64_t, float64_index_t, float64_column_head, p_float64_index, float64_data, P_IDX, P_DATA_FRAME_DATA->col_cnt) \
         } \
     } \
     else if (data_frame_info->TYPE == BSON_TYPE_BOOL) { \
         bool_data = bson_iter_bool (&ITER); \
         if (IS_INDEX) { \
-            __PROCESS_NUMBER_INDEX_OR_COLUMN (bool_t, bool_index_t, bool_index_head, p_bool_index, bool_data, P_IDX) \
+            __PROCESS_NUMBER_INDEX_OR_COLUMN (bool_t, bool_index_t, bool_index_head, p_bool_index, bool_data, P_IDX, P_DATA_FRAME_DATA->row_cnt) \
         } \
         else { \
-            __PROCESS_NUMBER_INDEX_OR_COLUMN (bool_t, bool_index_t, bool_column_head, p_bool_index, bool_data, P_IDX) \
+            __PROCESS_NUMBER_INDEX_OR_COLUMN (bool_t, bool_index_t, bool_column_head, p_bool_index, bool_data, P_IDX, P_DATA_FRAME_DATA->col_cnt) \
         } \
     } \
     else { \
         continue; \
     }
 
+//            p_string_index->key = (char *) malloc (sizeof(string_data) + 1); \
+//            memcpy(p_string_index->key, string_data, sizeof(string_data) + 1); \
 
 #define _INSERT_VALUE_NODE(VALUE_NODE_T, VALUE_CHAIN_HEAD, CREATE_DATA, DATA, P_INDEX_IDX, P_COLUMN_IDX) \
     VALUE_NODE_T *__p_node = (VALUE_NODE_T *) malloc (sizeof (VALUE_NODE_T) ); \
