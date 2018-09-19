@@ -5,7 +5,7 @@ import random
 
 client = MongoClient('mongodb://hqs:f@localhost:27017/test')
 db = client['test']
-collection = db['cymongo_1000_4000_int']
+collection = db['cymongo_1000_4000']
 # collection = db['cymongo']
 
 row_cnt = 1000  # day count
@@ -29,8 +29,8 @@ for delta_day in range(row_cnt):
         date_time = start_date_time + datetime.timedelta(days=delta_day)
         doc = OrderedDict()
         doc['date_time'] = date_time                                                                 # index: date time
-        doc['blogger_id'] = blogger_id
-        # doc['blogger_id'] = '{}{}'.format('0' * (11 - len(str_blogger_id)), str_blogger_id)          # column: string
+        # doc['blogger_id'] = blogger_id
+        doc['blogger_id'] = '{}{}'.format('0' * (11 - len(str_blogger_id)), str_blogger_id)          # column: string
         doc['signature'] = signatures[random.randint(0, len(signatures)-1)]                          # string value
         # doc['daily_visitor_cnt'] = random.randint(1000, 100000)                                    # int32 value
         # doc['fan_cnt'] = random.randint(10000000000, 100000000000)                                 # int64 value
