@@ -12,7 +12,7 @@ import unittest
 class CymongoTest(unittest.TestCase):
     mongo_uri = 'mongodb://hqs:f@localhost:27017/test'
     db = 'test'
-    enable_debug = True
+    enable_debug = False
     index_name = 'date_time'
     column_name = 'blogger_id'
     value_names = [  # 'signature', 'last_logged_date_time'
