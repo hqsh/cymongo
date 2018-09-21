@@ -1,5 +1,4 @@
 from ctypes import *
-import ctypes
 
 ILLEGAL_MONGOC_URI_ERROR_CODE = -1         # illegal mongo uri
 CREATE_CLIENT_INSTANCE_ERROR_CODE = -2    # create client instance failed
@@ -28,6 +27,15 @@ BSON_TYPE_INT64 = 0x12       # supported for DataFrame dtypes
 BSON_TYPE_MAXKEY = 0x7F
 BSON_TYPE_MINKEY = 0xFF
 
+
+# nan_process_method_t
+class DefaultNanValue(Structure):
+    _fields_ = [
+        ('default_int32_nan_value', c_int32),
+        ('default_int64_nan_value', c_int64),
+        ('default_date_time_nan_value', c_int64),
+        ('default_bool_nan_value', c_bool)
+    ]
 
 # data_frame_info_t
 class DataFrameInfo(Structure):

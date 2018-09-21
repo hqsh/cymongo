@@ -3,6 +3,7 @@
 
 #include "cymongo_type.h"
 #include "error_code.h"
+#include <bcon.h>
 #include <string.h>
 
 #define _CHAR_STRING_TO_UNI_CHAR_STRING(CHAR_STRING, UNI_CHAR_STRING, UNI_STRING_LENGTH) \
@@ -27,28 +28,65 @@
 #define _CREATE_NUMBER_DATA(P_NODE, DATA) \
     P_NODE->data = DATA;
 
+#define _TRANSFER_DATE_TIME_FORMAT(DATE_TIME, NEW_DATE_TIME) \
+    millisecond = DATE_TIME % 1000; \
+    time = DATE_TIME / 1000; \
+    struct tm *p_date_time = gmtime(&time); \
+    year = p_date_time->tm_year + 1900; \
+    month = p_date_time->tm_mon + 1; \
+    day = p_date_time->tm_mday; \
+    hour = p_date_time->tm_hour; \
+    minute = p_date_time->tm_min; \
+    second = p_date_time->tm_sec; \
+    NEW_DATE_TIME = year * 10000000000000 + month * 100000000000 + day * 1000000000 + hour * 10000000 + minute * 100000 + second * 1000 + millisecond;
+
+#define _DEFINE_TEMPORARY_VARIABLE \
+    const char *string_data; \
+    int32_t int32_data; \
+    int64_t int64_data; \
+    bool_t is_int64; \
+    date_time_t date_time_data; \
+    date_time_t year, month, day, hour, minute, second, millisecond, formatted_date_time; \
+    time_t time; \
+    struct tm *p_date_time; \
+    float64_t float64_data; \
+    bool_t bool_data; \
+    uint32_t length; \
+    uint64_t uni_string_length; \
+    uint64_t *p_index_idx, *p_column_idx;
+
 int string_index_sort (string_index_t *a, string_index_t *b) {
     return strcmp(a->key, b->key);
 }
 
 int int32_index_sort (int32_index_t *a, int32_index_t *b) {
-    return (a->data - b->data);
+    if (a->data < b->data) return (int) -1;
+    if (a->data == b->data) return (int) 0;
+    return (int) 1;
 }
 
 int int64_index_sort (int64_index_t *a, int64_index_t *b) {
-    return (a->data - b->data);
+    if (a->data < b->data) return (int) -1;
+    if (a->data == b->data) return (int) 0;
+    return (int) 1;
 }
 
 int date_time_index_sort (date_time_index_t *a, date_time_index_t *b) {
-    return (a->data - b->data);
+    if (a->data < b->data) return (int) -1;
+    if (a->data == b->data) return (int) 0;
+    return (int) 1;
 }
 
 int float64_index_sort (float64_index_t *a, float64_index_t *b) {
-    return (a->data - b->data);
+    if (a->data < b->data) return (int) -1;
+    if (a->data == b->data) return (int) 0;
+    return (int) 1;
 }
 
 int bool_index_sort (bool_index_t *a, bool_index_t *b) {
-    return (a->data - b->data);
+    if (a->data < b->data) return (int) -1;
+    if (a->data == b->data) return (int) 0;
+    return (int) 1;
 }
 
 #endif

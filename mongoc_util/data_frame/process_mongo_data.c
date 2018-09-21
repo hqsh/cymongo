@@ -17,33 +17,31 @@
     P_IDX = NULL; \
     if (data_frame_info->TYPE == BSON_TYPE_UNKNOWN) { \
         data_frame_info->TYPE = bson_iter_type(&ITER); \
+        if (data_frame_info->TYPE == BSON_TYPE_INT32) { \
+            data_frame_info->TYPE = BSON_TYPE_INT64; \
+        } \
+    } \
+    if (data_frame_info->TYPE == BSON_TYPE_INT64) { \
+        is_int64 = bson_iter_type(&ITER) == BSON_TYPE_INT64; \
     } \
     if (data_frame_info->TYPE == BSON_TYPE_UTF8) { \
         string_data = bson_iter_utf8 (&ITER, &length); \
         if (MAX_STRING_LENGTH < length) { \
             MAX_STRING_LENGTH = length; \
         } \
-        p_string_index = NULL; \
-        unsigned cnt = HASH_COUNT (P_MONGO_DATA->string_column_head); \
+        char *str_data = (char *) malloc (strlen(string_data) + 1); \
+        memcpy (str_data, string_data, strlen(string_data) + 1); \
         if (IS_INDEX) { \
-            HASH_FIND_STR (P_MONGO_DATA->string_index_head, string_data, p_string_index); \
+            HASH_FIND_STR (P_MONGO_DATA->string_index_head, str_data, p_string_index); \
         } \
         else { \
-            HASH_FIND_STR (P_MONGO_DATA->string_column_head, string_data, p_string_index); \
-            if (cnt > 3999) { \
-                sleep(1); \
-                HASH_ITER (hh, P_MONGO_DATA->string_column_head, p_string_index, p_tmp_string_index) { \
-                    printf ("%s  ", p_string_index->key); \
-                } \
-                printf ("\n"); \
-            } \
-            printf ("count = %u\n", cnt); \
+            HASH_FIND_STR (P_MONGO_DATA->string_column_head, str_data, p_string_index); \
         } \
         if (!p_string_index) { \
             p_string_index = (string_index_t *) malloc (sizeof(string_index_t)); \
             memset (p_string_index, 0, sizeof(string_index_t)); \
-            p_string_index->key = string_data; \
-            _CHAR_STRING_TO_UNI_CHAR_STRING(string_data, p_string_index->data.string, p_string_index->data.length) \
+            p_string_index->key = str_data; \
+            _CHAR_STRING_TO_UNI_CHAR_STRING(str_data, p_string_index->data.string, p_string_index->data.length) \
             if (IS_INDEX) { \
                 HASH_ADD_KEYPTR (hh, P_MONGO_DATA->string_index_head, p_string_index->key, strlen(p_string_index->key), p_string_index); \
                 P_DATA_FRAME_DATA->row_cnt++; \
@@ -52,9 +50,6 @@
                 HASH_ADD_KEYPTR (hh, P_MONGO_DATA->string_column_head, p_string_index->key, strlen(p_string_index->key), p_string_index); \
                 P_DATA_FRAME_DATA->col_cnt++; \
             } \
-        } \
-        else { \
-            printf ("%s\n", p_string_index->key); \
         } \
         P_IDX = &(p_string_index->idx); \
     } \
@@ -67,7 +62,16 @@
             __PROCESS_NUMBER_INDEX_OR_COLUMN (int32_t, int32_index_t, int32_column_head, p_int32_index, int32_data, P_IDX, P_DATA_FRAME_DATA->col_cnt) \
         } \
     } \
-    else if (data_frame_info->TYPE == BSON_TYPE_INT64) { \
+    else if (data_frame_info->TYPE == BSON_TYPE_INT64 && !is_int64) { \
+        int32_data = bson_iter_int32 (&ITER); \
+        if (IS_INDEX) { \
+            __PROCESS_NUMBER_INDEX_OR_COLUMN (int64_t, int64_index_t, int64_index_head, p_int64_index, int32_data, P_IDX, P_DATA_FRAME_DATA->row_cnt) \
+        } \
+        else { \
+            __PROCESS_NUMBER_INDEX_OR_COLUMN (int64_t, int64_index_t, int64_index_head, p_int64_index, int32_data, P_IDX, P_DATA_FRAME_DATA->col_cnt) \
+        } \
+    } \
+    else if (data_frame_info->TYPE == BSON_TYPE_INT64 && is_int64) { \
         int64_data = bson_iter_int64 (&ITER); \
         if (IS_INDEX) { \
             __PROCESS_NUMBER_INDEX_OR_COLUMN (int64_t, int64_index_t, int64_index_head, p_int64_index, int64_data, P_IDX, P_DATA_FRAME_DATA->row_cnt) \
@@ -78,11 +82,13 @@
     } \
     else if (data_frame_info->TYPE == BSON_TYPE_DATE_TIME) { \
         date_time_data = bson_iter_date_time (&ITER); \
+        formatted_date_time; \
+        _TRANSFER_DATE_TIME_FORMAT(date_time_data, formatted_date_time) \
         if (IS_INDEX) { \
-            __PROCESS_NUMBER_INDEX_OR_COLUMN (date_time_t, date_time_index_t, date_time_index_head, p_date_time_index, date_time_data, P_IDX, P_DATA_FRAME_DATA->row_cnt) \
+            __PROCESS_NUMBER_INDEX_OR_COLUMN (date_time_t, date_time_index_t, date_time_index_head, p_date_time_index, formatted_date_time, P_IDX, P_DATA_FRAME_DATA->row_cnt) \
         } \
         else { \
-            __PROCESS_NUMBER_INDEX_OR_COLUMN (date_time_t, date_time_index_t, date_time_column_head, p_date_time_index, date_time_data, P_IDX, P_DATA_FRAME_DATA->col_cnt) \
+            __PROCESS_NUMBER_INDEX_OR_COLUMN (date_time_t, date_time_index_t, date_time_column_head, p_date_time_index, formatted_date_time, P_IDX, P_DATA_FRAME_DATA->col_cnt) \
         } \
     } \
     else if (data_frame_info->TYPE == BSON_TYPE_DOUBLE) { \
@@ -107,8 +113,6 @@
         continue; \
     }
 
-//            p_string_index->key = (char *) malloc (sizeof(string_data) + 1); \
-//            memcpy(p_string_index->key, string_data, sizeof(string_data) + 1); \
 
 #define _INSERT_VALUE_NODE(VALUE_NODE_T, VALUE_CHAIN_HEAD, CREATE_DATA, DATA, P_INDEX_IDX, P_COLUMN_IDX) \
     VALUE_NODE_T *__p_node = (VALUE_NODE_T *) malloc (sizeof (VALUE_NODE_T) ); \
@@ -124,7 +128,11 @@
         if (bson_iter_init (&ITER, doc) && bson_iter_find (&ITER, P_DATA_FRAME_INFO->value_keys[value_idx])) { \
             if (P_DATA_FRAME_INFO->value_types[value_idx] == BSON_TYPE_UNKNOWN) { \
                 P_DATA_FRAME_INFO->value_types[value_idx] = bson_iter_type(&ITER); \
+                if (P_DATA_FRAME_INFO->value_types[value_idx] == BSON_TYPE_INT32) { \
+                    P_DATA_FRAME_INFO->value_types[value_idx] = BSON_TYPE_INT64; \
+                } \
             } \
+            is_int64 = bson_iter_type(&ITER) == BSON_TYPE_INT64; \
             if (P_DATA_FRAME_INFO->value_types[value_idx] == BSON_TYPE_UTF8) { \
                 string_data = bson_iter_utf8 (&ITER, &length); \
                 _INSERT_VALUE_NODE (string_value_node_t, P_MONGO_DATA->string_value_chain_heads[value_idx], _CREATE_UNI_CHAR_STRING_DATA, string_data, P_INDEX_IDX, P_COLUMN_IDX) \
@@ -136,13 +144,18 @@
                 int32_data = bson_iter_int32 (&ITER); \
                 _INSERT_VALUE_NODE (int32_value_node_t, P_MONGO_DATA->int32_value_chain_heads[value_idx], _CREATE_NUMBER_DATA, int32_data, P_INDEX_IDX, P_COLUMN_IDX) \
             } \
-            else if (P_DATA_FRAME_INFO->value_types[value_idx] == BSON_TYPE_INT64) { \
+            else if (P_DATA_FRAME_INFO->value_types[value_idx] == BSON_TYPE_INT64 && !is_int64) { \
+                int32_data = bson_iter_int32 (&ITER); \
+                _INSERT_VALUE_NODE (int64_value_node_t, P_MONGO_DATA->int64_value_chain_heads[value_idx], _CREATE_NUMBER_DATA, int32_data, P_INDEX_IDX, P_COLUMN_IDX) \
+            } \
+            else if (P_DATA_FRAME_INFO->value_types[value_idx] == BSON_TYPE_INT64 && is_int64) { \
                 int64_data = bson_iter_int64 (&ITER); \
                 _INSERT_VALUE_NODE (int64_value_node_t, P_MONGO_DATA->int64_value_chain_heads[value_idx], _CREATE_NUMBER_DATA, int64_data, P_INDEX_IDX, P_COLUMN_IDX) \
             } \
             else if (P_DATA_FRAME_INFO->value_types[value_idx] == BSON_TYPE_DATE_TIME) { \
-                int64_data = bson_iter_date_time (&ITER); \
-                _INSERT_VALUE_NODE (date_time_value_node_t, P_MONGO_DATA->date_time_value_chain_heads[value_idx], _CREATE_NUMBER_DATA, int64_data, P_INDEX_IDX, P_COLUMN_IDX) \
+                date_time_data = bson_iter_date_time (&ITER); \
+                _TRANSFER_DATE_TIME_FORMAT(date_time_data, formatted_date_time) \
+                _INSERT_VALUE_NODE (date_time_value_node_t, P_MONGO_DATA->date_time_value_chain_heads[value_idx], _CREATE_NUMBER_DATA, formatted_date_time, P_INDEX_IDX, P_COLUMN_IDX) \
             } \
             else if (P_DATA_FRAME_INFO->value_types[value_idx] == BSON_TYPE_DOUBLE) { \
                 float64_data = bson_iter_double (&ITER); \

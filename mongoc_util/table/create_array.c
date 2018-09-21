@@ -16,9 +16,16 @@ table_t * init_table (unsigned int column_cnt) {
     return p_table;
 }
 
-#define __CREATE_TABLE_NUMBER_COLUMN(COLUMNS, TYPE, NODE_T, NODE_CHAIN_HEADS, NAN_VALUE) \
+#define __CREATE_TABLE_NUMBER_COLUMN(COLUMNS, TYPE, NODE_T, NODE_CHAIN_HEADS, NAN_VALUE, NAN_VALUE_IS_BYTE) \
     p_table->COLUMNS[idx] = (TYPE *) malloc (sizeof(TYPE) * p_table->row_cnt); \
-    memset (p_table->COLUMNS[idx], NAN_VALUE, sizeof(TYPE) * p_table->row_cnt); \
+    if (NAN_VALUE_IS_BYTE) { \
+        memset (p_table->COLUMNS[idx], NAN_VALUE, sizeof(TYPE) * p_table->row_cnt); \
+    } \
+    else { \
+        for (uint64_t i = 0; i < p_table->row_cnt; i++) { \
+            memcpy (p_table->COLUMNS[idx] + i, &NAN_VALUE, sizeof(TYPE)); \
+        } \
+    } \
     NODE_T *p_last_node; \
     for (NODE_T *p_node = p_node_chain_heads->NODE_CHAIN_HEADS[idx]; p_node; ) { \
         p_table->COLUMNS[idx][p_node->idx] = p_node->data; \
@@ -27,7 +34,7 @@ table_t * init_table (unsigned int column_cnt) {
         free (p_last_node); \
     }
 
-void create_table_array (table_info_t *p_table_info, node_chain_heads_t *p_node_chain_heads, table_t *p_table) {
+void create_table_array (table_info_t *p_table_info, node_chain_heads_t *p_node_chain_heads, table_t *p_table, default_nan_value_t *p_default_nan_value) {
     for (unsigned int idx = 0; idx < p_table_info->column_cnt; idx++) {
         int column_type = p_table_info->column_types[idx];
         if (column_type == BSON_TYPE_UTF8) {
@@ -46,19 +53,20 @@ void create_table_array (table_info_t *p_table_info, node_chain_heads_t *p_node_
             }
         }
         else if (column_type == BSON_TYPE_INT32) {
-            __CREATE_TABLE_NUMBER_COLUMN (int32_columns, int32_t, int32_node_t, int32_node_chain_heads, 0)
+            __CREATE_TABLE_NUMBER_COLUMN (int32_columns, int32_t, int32_node_t, int32_node_chain_heads, p_default_nan_value->default_int32_nan_value, false)
         }
         else if (column_type == BSON_TYPE_INT64) {
-            __CREATE_TABLE_NUMBER_COLUMN (int64_columns, int64_t, int64_node_t, int64_node_chain_heads, 0)
+            __CREATE_TABLE_NUMBER_COLUMN (int64_columns, int64_t, int64_node_t, int64_node_chain_heads, p_default_nan_value->default_int64_nan_value, false)
         }
         else if (column_type == BSON_TYPE_DATE_TIME) {
-            __CREATE_TABLE_NUMBER_COLUMN (date_time_columns, date_time_t, date_time_node_t, date_time_node_chain_heads, 0)
+            __CREATE_TABLE_NUMBER_COLUMN (date_time_columns, date_time_t, date_time_node_t, date_time_node_chain_heads, p_default_nan_value->default_date_time_nan_value, false)
         }
         else if (column_type == BSON_TYPE_DOUBLE) {
-            __CREATE_TABLE_NUMBER_COLUMN (float64_columns, float64_t, float64_node_t, float64_node_chain_heads, -1)
+            uint8_t float64_nan_value = -1;  // 4 "-1"s in memory is float64 nan
+            __CREATE_TABLE_NUMBER_COLUMN (float64_columns, float64_t, float64_node_t, float64_node_chain_heads, float64_nan_value, true)
         }
         else if (column_type == BSON_TYPE_BOOL) {
-            __CREATE_TABLE_NUMBER_COLUMN (bool_columns, bool_t, bool_node_t, bool_node_chain_heads, 0)
+            __CREATE_TABLE_NUMBER_COLUMN (bool_columns, bool_t, bool_node_t, bool_node_chain_heads, p_default_nan_value->default_bool_nan_value, false)
         }
     }
 }

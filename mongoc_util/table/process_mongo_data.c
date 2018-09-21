@@ -25,28 +25,6 @@ node_chain_heads_t * init_node_chain_heads_t (unsigned int column_cnt) {
     P_NODE->next = CHAIN_HEAD; \
     CHAIN_HEAD = P_NODE;
 
-
-//#define _PROCESS_TABLE(ITER, BSON_TYPE, COLUMN_IDX, IDX) \
-//    if (bson_type == BSON_TYPE_UTF8) { \
-//        string_data = bson_iter_utf8 (&ITER, &length); \
-//    } \
-//    else if (bson_type == BSON_TYPE_INT32) { \
-//        int32_data = bson_iter_int32 (&ITER); \
-//    } \
-//    else if (bson_type == BSON_TYPE_INT64) { \
-//        int64_data = bson_iter_int64 (&ITER); \
-//    } \
-//    else if (bson_type == BSON_TYPE_DATE_TIME) { \
-//        date_time_data = bson_iter_date_time (&ITER); \
-//    } \
-//    else if (bson_type == BSON_TYPE_DOUBLE) { \
-//        float64_data = bson_iter_double (&ITER); \
-//    } \
-//    else if (bson_type == BSON_TYPE_BOOL) { \
-//        bool_data = bson_iter_bool (&ITER); \
-//    }
-
-
 #define _PROCESS_TABLE(ITER, BSON_TYPE, COLUMN_IDX, IDX) \
     if (bson_type == BSON_TYPE_UTF8) { \
         string_data = bson_iter_utf8 (&ITER, &length); \
@@ -63,14 +41,20 @@ node_chain_heads_t * init_node_chain_heads_t (unsigned int column_cnt) {
         _CREATE_NUMBER_NODE (int32_node_t, p_int32_node, IDX, int32_data) \
         _INSERT_NODE (p_node_chain_heads->int32_node_chain_heads[COLUMN_IDX], p_int32_node) \
     } \
-    else if (bson_type == BSON_TYPE_INT64) { \
+    else if (bson_type == BSON_TYPE_INT64 && !is_int64) { \
+        int32_data = bson_iter_int32 (&ITER); \
+        _CREATE_NUMBER_NODE (int64_node_t, p_int64_node, IDX, int32_data) \
+        _INSERT_NODE (p_node_chain_heads->int64_node_chain_heads[COLUMN_IDX], p_int64_node) \
+    } \
+    else if (bson_type == BSON_TYPE_INT64 && is_int64) { \
         int64_data = bson_iter_int64 (&ITER); \
         _CREATE_NUMBER_NODE (int64_node_t, p_int64_node, IDX, int64_data) \
         _INSERT_NODE (p_node_chain_heads->int64_node_chain_heads[COLUMN_IDX], p_int64_node) \
     } \
     else if (bson_type == BSON_TYPE_DATE_TIME) { \
         date_time_data = bson_iter_date_time (&ITER); \
-        _CREATE_NUMBER_NODE (date_time_node_t, p_date_time_node, IDX, date_time_data) \
+        _TRANSFER_DATE_TIME_FORMAT(date_time_data, formatted_date_time) \
+        _CREATE_NUMBER_NODE (date_time_node_t, p_date_time_node, IDX, formatted_date_time) \
         _INSERT_NODE (p_node_chain_heads->date_time_node_chain_heads[COLUMN_IDX], p_date_time_node) \
     } \
     else if (bson_type == BSON_TYPE_DOUBLE) { \

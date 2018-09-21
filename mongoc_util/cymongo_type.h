@@ -15,6 +15,14 @@ typedef struct {
     uint64_t length;
 } string_t;
 
+// default_nan_value_t
+typedef struct {
+    int32_t default_int32_nan_value;
+    int64_t default_int64_nan_value;
+    int64_t default_date_time_nan_value;
+    bool_t default_bool_nan_value;
+} default_nan_value_t;
+
 // ------------------------------ [start] data structure from mongo [start] ------------------------------
 // the data and information of index or columns of DataFrame
 typedef struct {

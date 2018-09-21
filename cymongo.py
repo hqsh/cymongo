@@ -1,7 +1,11 @@
 from mongoc_api_define import *
 from collections import OrderedDict
+from logger import with_logger
 import numpy as np
 import pandas as pd
+import json
+import datetime
+import time
 
 
 class CyMongo:
@@ -54,9 +58,51 @@ class CyMongo:
                 mongoc_uri += '?authSource={}'.format(db_name)
         return cls.to_bytes(mongoc_uri, 'mongoc_uri') if return_bytes else mongoc_uri
 
+    @staticmethod
+    def datetime_as_json_dict(dt, offset_hour=None):
+        '''
+        transfer python datetime to json (in dict format, used to create bson)
+        :param offset_hour:
+        :return:
+        '''
+        if isinstance(offset_hour, int):
+            dt += datetime.timedelta(hours=offset_hour)
+        return {'$date': int(time.mktime(dt.timetuple())) * 1000 + dt.microsecond // 1000}
+
+    @staticmethod
+    def int_datetime_as_json_dict(int_dt, offset_hour=None, tzinfo=None):
+        '''
+        transfer python int datetime to json (in dict format, used to create bson)
+        :param int_dt: for example, 20100101123456789, which is represent as 2010-01-01 12:34:56.789
+        :param offset_hour:
+        :param tzinfo:
+        :return:
+        '''
+        year = int_dt // 10000000000000
+        month = int_dt % 10000000000000 // 100000000000
+        day = int_dt % 100000000000 // 1000000000
+        hour = int_dt % 1000000000 // 10000000
+        minute = int_dt % 10000000 // 100000
+        second = int_dt % 100000 // 1000
+        microsecond = int_dt % 1000 * 1000
+        dt = datetime.datetime(year, month, day, hour, minute, second, microsecond, tzinfo=tzinfo)
+        if isinstance(offset_hour, int):
+            dt += datetime.timedelta(hours=offset_hour)
+        return CyMongo.datetime_as_json_dict(dt)
+
 
 class CyMongoClient(CyMongo):
     def __init__(self, mongoc_uri):
+        try:
+            at_idx = mongoc_uri.index('@')
+        except ValueError:
+            raise CyMongoException('mongo uri is illegal, it should include "@".')
+        split_uri = mongoc_uri.split('/')
+        last_slash_idx = -1
+        for s in split_uri[: -1]:
+            last_slash_idx += len(s) + 1
+        if last_slash_idx > at_idx:
+            mongoc_uri = mongoc_uri[: last_slash_idx]
         self.__mongoc_uri = self.to_bytes(mongoc_uri, 'mongoc_uri')
         if self.mongoc_uri_has_auth_source(mongoc_uri):
             self.__mongoc_client = self.get_mongoc_client(self.__mongoc_uri)
@@ -94,6 +140,7 @@ class CyMongoDatabase(CyMongo):
         return CyMongoCollection(self.__mongoc_client, self.__db_name, collection_name)
 
 
+@with_logger
 class CyMongoCollection(CyMongo):
     __supported_number_types = ['date_time', 'int32', 'int64', 'float64', 'bool']
     __supported_types = ['string'] + __supported_number_types
@@ -116,6 +163,14 @@ class CyMongoCollection(CyMongo):
         self.__column_names = None
         self.__table_info = None
         self.__debug = False
+        # keep int (-2^31 or -2^63) when it is nan, or transform all values to float
+        self.__keep_int_when_has_nan_value = True
+        self.__nan_process_method = DefaultNanValue(
+            c_int32(- 2 ** 31),  # default_int32_nan_value
+            c_int64(- 2 ** 63),  # default_int64_nan_value
+            c_int64(0),  # default_date_time_nan_value, it is just zero in int datetime, not 1970-01-01 00:00:00.000
+            c_bool(False)  # default_bool_value
+        )
 
     @classmethod
     def bson_type_to_type(cls, bson_type):
@@ -165,6 +220,17 @@ class CyMongoCollection(CyMongo):
             c_char_p_array(*byte_column_names),
             c_int_array(*column_types),
             c_uint(column_cnt)
+        )
+
+    def set_nan_process_method(self, keep_int_when_has_nan_value=True, default_int32_nan_value=-2**31,
+                               default_int64_nan_value=-2**63, default_date_time_nan_value=0,
+                               default_bool_value=False):
+        self.__keep_int_when_has_nan_value = keep_int_when_has_nan_value
+        self.__nan_process_method = DefaultNanValue(
+            c_int32(default_int32_nan_value),
+            c_int64(default_int64_nan_value),
+            c_int64(default_date_time_nan_value),
+            c_bool(default_bool_value)
         )
 
     def __get_index_or_column(self, data_frame_data, index_or_column):
@@ -227,62 +293,55 @@ class CyMongoCollection(CyMongo):
                 table[self.__column_names[idx]] = array
         return table
 
-    def find_as_data_frame(self, filter=None):
-        # import time
-        # begin = time.time()
-        data_frame_data = self.mongoc_api.find_as_data_frame(
-            self.__mongoc_collection, pointer(self.__data_frame_info), self.__debug)
-        # print(time.time() - begin)
-        index = self.__get_index_or_column(data_frame_data, 'index')
-        index = pd.Index(index, name=self.__index_key)
-        column = self.__get_index_or_column(data_frame_data, 'column')
-        column = pd.Index(column, name=self.__column_key)
-        values = self.__get_values(data_frame_data)
-        dfs = OrderedDict()
-        for value_key, value in values.items():
-            dfs[value_key] = pd.DataFrame(value, index=index, columns=column)
-        # print(time.time() - begin)
-        return dfs
-
     def find(self, filter=None, return_type='table'):
         if self.__debug:
             import time
             begin = time.time()
         if return_type == 'data_frame':
-            data_frame_data = self.mongoc_api.find_as_data_frame(self.__mongoc_collection, pointer(self.__data_frame_info), self.__debug)
+            if isinstance(filter, dict):
+                filter = self.to_bytes(json.dumps(filter), 'filter')
+            elif isinstance(filter, str):
+                filter = self.to_bytes(filter, 'filter')
+            data_frame_data = self.mongoc_api.find_as_data_frame(
+                    self.__mongoc_collection, pointer(self.__nan_process_method),
+                    pointer(self.__data_frame_info), filter, self.__debug)
             if self.__debug:
-                print('get_data_from_c cost: {}'.format(time.time() - begin))
+                self.logger.debug('get_data_from_c cost: {}'.format(time.time() - begin))
             index = self.__get_index_or_column(data_frame_data, 'index')
             index = pd.Index(index, name=self.__index_key)
             if self.__debug:
-                print('get df index cost: {}'.format(time.time() - begin))
-                print(index)
+                self.logger.debug('get df index cost: {}'.format(time.time() - begin))
+                self.logger.debug(index)
             column = self.__get_index_or_column(data_frame_data, 'column')
             column = pd.Index(column, name=self.__column_key)
             if self.__debug:
-                print('get df column cost: {}'.format(time.time() - begin))
-                print(column)
+                self.logger.debug('get df column cost: {}'.format(time.time() - begin))
+                self.logger.debug(column)
             values = self.__get_values(data_frame_data)
             if self.__debug:
-                print('get df values cost: {}'.format(time.time() - begin))
+                self.logger.debug('get df values cost: {}'.format(time.time() - begin))
             dfs = OrderedDict()
             for value_key, value in values.items():
-                if value_key == 'blog_updated':
-                    print('---------------', value.size, value.shape, (value == True).sum(), (value == False).sum())
                 dfs[value_key] = pd.DataFrame(value, index=index, columns=column)
             if self.__debug:
-                print('create dfs cost: {}'.format(time.time() - begin))
+                self.logger.debug('create dfs cost: {}'.format(time.time() - begin))
             return dfs
         if return_type == 'table':
-            c_table = self.mongoc_api.find_as_table(self.__mongoc_collection, pointer(self.__table_info), self.__debug)
+            if isinstance(filter, dict):
+                filter = self.to_bytes(json.dumps(filter), 'filter')
+            elif isinstance(filter, str):
+                filter = self.to_bytes(filter, 'filter')
+            c_table = self.mongoc_api.find_as_table(
+                    self.__mongoc_collection, pointer(self.__nan_process_method),
+                    pointer(self.__table_info), filter, self.__debug)
             if self.__debug:
-                print('get_data_from_c cost: {}'.format(time.time() - begin))
+                self.logger.debug('get_data_from_c cost: {}'.format(time.time() - begin))
             table = self.__get_table(c_table)
             if self.__debug:
-                print('transfer data into dict cost: {}'.format(time.time() - begin))
+                self.logger.debug('transfer data into dict cost: {}'.format(time.time() - begin))
             df = pd.DataFrame(table)
             if self.__debug:
-                print('create df cost: {}'.format(time.time() - begin))
+                self.logger.debug('create df cost: {}'.format(time.time() - begin))
             return df
         raise ValueError('Unknown return_type: {}.'.format(return_type))
 
