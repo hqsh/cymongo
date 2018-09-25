@@ -62,11 +62,17 @@ void create_table_array (table_info_t *p_table_info, node_chain_heads_t *p_node_
             __CREATE_TABLE_NUMBER_COLUMN (date_time_columns, date_time_t, date_time_node_t, date_time_node_chain_heads, p_default_nan_value->default_date_time_nan_value, false)
         }
         else if (column_type == BSON_TYPE_DOUBLE) {
-            uint8_t float64_nan_value = -1;  // 4 "-1"s in memory is float64 nan
+            uint8_t float64_nan_value = 255;  // 4 "255"s in memory is float64 nan
             __CREATE_TABLE_NUMBER_COLUMN (float64_columns, float64_t, float64_node_t, float64_node_chain_heads, float64_nan_value, true)
         }
         else if (column_type == BSON_TYPE_BOOL) {
             __CREATE_TABLE_NUMBER_COLUMN (bool_columns, bool_t, bool_node_t, bool_node_chain_heads, p_default_nan_value->default_bool_nan_value, false)
         }
     }
+    free (p_node_chain_heads->string_node_chain_heads);
+    free (p_node_chain_heads->int32_node_chain_heads);
+    free (p_node_chain_heads->int64_node_chain_heads);
+    free (p_node_chain_heads->date_time_node_chain_heads);
+    free (p_node_chain_heads->float64_node_chain_heads);
+    free (p_node_chain_heads->bool_node_chain_heads);
 }

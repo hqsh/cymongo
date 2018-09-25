@@ -10,6 +10,7 @@ import time
 
 class CyMongo:
     mongoc_api = cdll.LoadLibrary("./mongoc_api.so")
+    mongoc_api.get_pool.restype = POINTER(c_void_p)
     mongoc_api.get_client.restype = POINTER(c_void_p)
     mongoc_api.get_database.restype = POINTER(c_void_p)
     mongoc_api.get_collection.restype = POINTER(c_void_p)
@@ -92,7 +93,7 @@ class CyMongo:
 
 
 class CyMongoClient(CyMongo):
-    def __init__(self, mongoc_uri):
+    def __init__(self, mongoc_uri, use_client_pool=True):
         try:
             at_idx = mongoc_uri.index('@')
         except ValueError:
@@ -105,39 +106,66 @@ class CyMongoClient(CyMongo):
             mongoc_uri = mongoc_uri[: last_slash_idx]
         self.__mongoc_uri = self.to_bytes(mongoc_uri, 'mongoc_uri')
         if self.mongoc_uri_has_auth_source(mongoc_uri):
-            self.__mongoc_client = self.get_mongoc_client(self.__mongoc_uri)
+            self.__mongoc_client_pool, self.__mongoc_client = self.get_mongoc_client(self.__mongoc_uri)
         else:
-            self.__mongoc_client = None
+            self.__mongoc_client_pool, self.__mongoc_client = None, None
+        self.__use_client_pool = use_client_pool
+        self.__is_closed = False
 
-    @classmethod
-    def get_mongoc_client(cls, mongoc_uri):
-        mongoc_uri = cls.to_bytes(mongoc_uri, 'mongoc_uri')
-        error_code = c_int()
-        mongoc_client = cls.mongoc_api.get_client(mongoc_uri, byref(error_code))
-        if error_code.value == ILLEGAL_MONGOC_URI_ERROR_CODE:
+    @property
+    def is_closed(self):
+        return self.__is_closed
+
+    @staticmethod
+    def __check_error_code(error_code):
+        if error_code == ILLEGAL_MONGOC_URI_ERROR_CODE:
             raise CyMongoException('illegal mongo uri')
-        if error_code.value == CREATE_CLIENT_INSTANCE_ERROR_CODE:
+        if error_code == CREATE_CLIENT_INSTANCE_ERROR_CODE:
             raise CyMongoException('create client instance failed')
-        return mongoc_client
+
+    def get_mongoc_client(self, mongoc_uri):
+        mongoc_uri = self.to_bytes(mongoc_uri, 'mongoc_uri')
+        error_code = c_int()
+        if self.__use_client_pool and self.__mongoc_client_pool is None:
+            self.__mongoc_client_pool = self.mongoc_api.get_pool(mongoc_uri, byref(error_code))
+            self.__check_error_code(error_code.value)
+        self.__mongoc_client = self.mongoc_api.get_client(mongoc_uri, self.__mongoc_client_pool, byref(error_code))
+        self.__check_error_code(error_code.value)
+        return self.__mongoc_client_pool, self.__mongoc_client
+
+    def close(self):
+        if self.__is_closed:
+            raise CyMongoClientIsClosedException
+        self.__is_closed = True
+        self.mongoc_api.close_client(self.__mongoc_client_pool, self.__mongoc_client)
+        self.__mongoc_client_pool = None
+        self.__mongoc_client = None
 
     def __getitem__(self, db_name):
-        return CyMongoDatabase(db_name, self.__mongoc_client, self.__mongoc_uri)
+        if self.__is_closed:
+            raise CyMongoClientIsClosedException
+        return CyMongoDatabase(db_name, self, self.__mongoc_client, self.__mongoc_uri, self.__mongoc_client_pool)
 
 
 class CyMongoDatabase(CyMongo):
-    def __init__(self, db_name, mongoc_client=None, mongoc_uri=None):
+    def __init__(self, db_name, cymongo_client, mongoc_client=None, mongoc_uri=None, mongoc_client_pool=None):
+        self.__cymongo_client = cymongo_client
         if mongoc_client is None:
             if mongoc_uri is None:
                 raise CyMongoException('"mongoc_client" and "mongoc_uri" cannot be both None')
             self.__mongoc_uri = self.mongoc_uri_append_auth_source(mongoc_uri, db_name)
-            self.__mongoc_client = CyMongoClient.get_mongoc_client(self.__mongoc_uri)
+            self.__mongoc_client_pool, self.__mongoc_client = self.__cymongo_client.get_mongoc_client(self.__mongoc_uri)
         else:
             self.__mongoc_client = mongoc_client
+            self.__mongoc_client_pool = mongoc_client_pool
         self.__db_name = self.to_bytes(db_name, 'db_name')
         self.__mongoc_db = self.mongoc_api.get_database(self.__mongoc_client, self.__db_name)
 
     def __getitem__(self, collection_name):
-        return CyMongoCollection(self.__mongoc_client, self.__db_name, collection_name)
+        if self.__cymongo_client.is_closed:
+            raise CyMongoClientIsClosedException
+        return CyMongoCollection(self.__cymongo_client, self.__mongoc_client, self.__db_name, collection_name,
+                                 self.__mongoc_client_pool)
 
 
 @with_logger
@@ -149,8 +177,13 @@ class CyMongoCollection(CyMongo):
     __supported_bson_types_to_types = {bson_type: _type
                                        for bson_type, _type in zip(__supported_bson_types, __supported_types)}
     __sys_addr_byte_cnt = 8
+    __default_int32_nan_value = -2**31
+    __default_int64_nan_value = -2**63
+    __default_date_time_nan_value = 0
+    __default_bool_value = False
 
-    def __init__(self, mongoc_client, db_name, collection_name):
+    def __init__(self, cymongo_client, mongoc_client, db_name, collection_name, mongoc_client_pool=None):
+        self.__cymongo_client = cymongo_client
         self.__mongoc_client = mongoc_client
         self.__db_name = self.to_bytes(db_name, 'db_name')
         self.__collection_name = self.to_bytes(collection_name, 'collection_name')
@@ -162,15 +195,17 @@ class CyMongoCollection(CyMongo):
         self.__data_frame_info = None
         self.__column_names = None
         self.__table_info = None
+        self.__options = None
         self.__debug = False
-        # keep int (-2^31 or -2^63) when it is nan, or transform all values to float
+        # keep int (-2^31 or -2^63) when it is nan, or transform all values to float64
         self.__keep_int_when_has_nan_value = True
         self.__nan_process_method = DefaultNanValue(
-            c_int32(- 2 ** 31),  # default_int32_nan_value
-            c_int64(- 2 ** 63),  # default_int64_nan_value
-            c_int64(0),  # default_date_time_nan_value, it is just zero in int datetime, not 1970-01-01 00:00:00.000
-            c_bool(False)  # default_bool_value
+            c_int32(self.__default_int32_nan_value),  # default_int32_nan_value
+            c_int64(self.__default_int64_nan_value),  # default_int64_nan_value
+            c_int64(self.__default_date_time_nan_value),  # default_date_time_nan_value, it is just zero in int datetime, not 1970-01-01 00:00:00.000
+            c_bool(self.__default_bool_value)  # default_bool_value
         )
+        self.__mongoc_client_pool = mongoc_client_pool
 
     @classmethod
     def bson_type_to_type(cls, bson_type):
@@ -186,6 +221,11 @@ class CyMongoCollection(CyMongo):
         self.__index_key = index_key
         self.__column_key = column_key
         self.__value_keys = list(value_keys)
+        if len(self.__value_keys) == 0:
+            raise ValueError('The count of elements in value_keys cannot be 0.')
+        projection = OrderedDict()
+        projection[self.__index_key] = True
+        projection[self.__column_key] = True
         index_key = self.to_bytes(index_key, 'index_key', accept_none=True)
         column_key = self.to_bytes(column_key, 'column_key', accept_none=True)
         byte_value_keys = []
@@ -193,6 +233,8 @@ class CyMongoCollection(CyMongo):
         for value_key in self.__value_keys:
             byte_value_keys.append(self.to_bytes(value_key, 'element of value_keys'))
             value_types.append(c_int(BSON_TYPE_UNKNOWN))
+            projection[value_key] = True
+        self.__options = self.to_bytes(json.dumps({'projection': projection}), 'projection')
         value_cnt = len(byte_value_keys)
         c_char_p_array = c_char_p * value_cnt
         c_int_array = c_int * value_cnt
@@ -207,12 +249,17 @@ class CyMongoCollection(CyMongo):
         )
 
     def set_table_info(self, column_names):
-        self.__column_names = column_names
+        self.__column_names = list(column_names)
+        if len(self.__column_names) == 0:
+            raise ValueError('The count of elements in column_names cannot be 0.')
         byte_column_names = []
         column_types = []
+        projection = OrderedDict()
         for column_name in self.__column_names:
             byte_column_names.append(self.to_bytes(column_name, 'element of column_names'))
             column_types.append(c_int(BSON_TYPE_UNKNOWN))
+            projection[column_name] = True
+        self.__options = self.to_bytes(json.dumps({'projection': projection}), 'projection')
         column_cnt = len(byte_column_names)
         c_char_p_array = c_char_p * column_cnt
         c_int_array = c_int * column_cnt
@@ -222,10 +269,26 @@ class CyMongoCollection(CyMongo):
             c_uint(column_cnt)
         )
 
-    def set_nan_process_method(self, keep_int_when_has_nan_value=True, default_int32_nan_value=-2**31,
-                               default_int64_nan_value=-2**63, default_date_time_nan_value=0,
-                               default_bool_value=False):
+    def set_nan_process_method(self, keep_int_when_has_nan_value=True, default_int32_nan_value=None,
+                               default_int64_nan_value=None, default_date_time_nan_value=None,
+                               default_bool_value=None):
         self.__keep_int_when_has_nan_value = keep_int_when_has_nan_value
+        if default_int32_nan_value is None:
+            default_int32_nan_value = self.__default_int32_nan_value
+        else:
+            self.__default_int32_nan_value = default_int32_nan_value
+        if default_int64_nan_value is None:
+            default_int64_nan_value = self.__default_int64_nan_value
+        else:
+            self.__default_int64_nan_value = default_int64_nan_value
+        if default_date_time_nan_value is None:
+            default_date_time_nan_value = self.__default_date_time_nan_value
+        else:
+            self.__default_date_time_nan_value = default_date_time_nan_value
+        if default_bool_value is None:
+            default_bool_value = self.__default_bool_value
+        else:
+            self.__default_bool_value = default_bool_value
         self.__nan_process_method = DefaultNanValue(
             c_int32(default_int32_nan_value),
             c_int64(default_int64_nan_value),
@@ -250,6 +313,18 @@ class CyMongoCollection(CyMongo):
     def __get_offset_c_pointer(cls, c_pointer, offset):
         return cast(c_void_p(cast(c_pointer, c_void_p).value + offset * cls.__sys_addr_byte_cnt), type(c_pointer))
 
+    def __transfer_int_array_with_nan_to_float_array(self, array):
+        if array.dtype in [np.int32, np.int64] and not self.__keep_int_when_has_nan_value:
+            if array.dtype == np.int32 and self.__default_int32_nan_value in array:
+                nan_mask = array == self.__default_int32_nan_value
+                array = array.astype(np.float64)
+                array[nan_mask] = np.nan
+            elif array.dtype == np.int64 and self.__default_int64_nan_value in array:
+                nan_mask = array == self.__default_int64_nan_value
+                array = array.astype(np.float64)
+                array[nan_mask] = np.nan
+        return array
+
     def __get_values(self, data_frame_data):
         values = OrderedDict()
         for value_idx, value_key in enumerate(self.__value_keys):
@@ -269,6 +344,7 @@ class CyMongoCollection(CyMongo):
                 values[value_key] = value_array
             elif array_type in self.__supported_number_types:
                 value_array = np.ctypeslib.as_array(c_array_p, shape=(row_cnt, col_cnt))
+                value_array = self.__transfer_int_array_with_nan_to_float_array(value_array)
                 values[value_key] = value_array
             else:
                 raise TypeError('Unknown array_type: {}'.format(array_type))
@@ -290,6 +366,7 @@ class CyMongoCollection(CyMongo):
                     array.shape = (array.shape[0], )
                 else:
                     array = np.ctypeslib.as_array(c_array, shape=(c_table.contents.row_cnt, ))
+                    array = self.__transfer_int_array_with_nan_to_float_array(array)
                 table[self.__column_names[idx]] = array
         return table
 
@@ -304,7 +381,7 @@ class CyMongoCollection(CyMongo):
                 filter = self.to_bytes(filter, 'filter')
             data_frame_data = self.mongoc_api.find_as_data_frame(
                     self.__mongoc_collection, pointer(self.__nan_process_method),
-                    pointer(self.__data_frame_info), filter, self.__debug)
+                    pointer(self.__data_frame_info), filter, self.__options, self.__debug)
             if self.__debug:
                 self.logger.debug('get_data_from_c cost: {}'.format(time.time() - begin))
             index = self.__get_index_or_column(data_frame_data, 'index')
@@ -333,7 +410,7 @@ class CyMongoCollection(CyMongo):
                 filter = self.to_bytes(filter, 'filter')
             c_table = self.mongoc_api.find_as_table(
                     self.__mongoc_collection, pointer(self.__nan_process_method),
-                    pointer(self.__table_info), filter, self.__debug)
+                    pointer(self.__table_info), filter, self.__options, self.__debug)
             if self.__debug:
                 self.logger.debug('get_data_from_c cost: {}'.format(time.time() - begin))
             table = self.__get_table(c_table)
@@ -348,3 +425,14 @@ class CyMongoCollection(CyMongo):
 
 class CyMongoException(Exception):
     pass
+
+
+class CyMongoUriIllegalException(CyMongoException):
+    def __init__(self, *args, **kwargs):
+        super().__init__(args, kwargs)
+
+
+class CyMongoClientIsClosedException(CyMongoException):
+    def __init__(self, *args, **kwargs):
+        self.message = 'Cannot support this operation, when the client is closed.'
+        self.args = (self.message, )

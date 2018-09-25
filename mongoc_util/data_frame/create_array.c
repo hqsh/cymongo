@@ -129,7 +129,7 @@ void create_value_array (data_frame_info_t *p_data_frame_info, mongo_data_t *p_m
             __CREATE_NUMBER_VALUE_ARRAY(date_time_t, date_time_value_arrays, date_time_value_node_t, date_time_value_chain_heads, p_default_nan_value->default_date_time_nan_value, false)
         }
         else if (p_data_frame_info->value_types[value_idx] == BSON_TYPE_DOUBLE) {
-            uint8_t float64_nan_value = -1;  // 4 "-1"s in memory is float64 nan
+            uint8_t float64_nan_value = 255;  // 4 "255"s in memory is float64 nan
             __CREATE_NUMBER_VALUE_ARRAY(float64_t, float64_value_arrays, float64_value_node_t, float64_value_chain_heads, float64_nan_value, true)
         }
         else if (p_data_frame_info->value_types[value_idx] == BSON_TYPE_BOOL) {

@@ -37,6 +37,7 @@ class DefaultNanValue(Structure):
         ('default_bool_nan_value', c_bool)
     ]
 
+
 # data_frame_info_t
 class DataFrameInfo(Structure):
     _fields_ = [
