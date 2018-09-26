@@ -41,7 +41,7 @@
             p_string_index = (string_index_t *) malloc (sizeof(string_index_t)); \
             memset (p_string_index, 0, sizeof(string_index_t)); \
             p_string_index->key = str_data; \
-            _CHAR_STRING_TO_UNI_CHAR_STRING(str_data, p_string_index->data.string, p_string_index->data.length) \
+            _CHAR_STRING_TO_UNI_CHAR_STRING (str_data, p_string_index->data.string, p_string_index->data.length) \
             if (IS_INDEX) { \
                 HASH_ADD_KEYPTR (hh, P_MONGO_DATA->string_index_head, p_string_index->key, strlen(p_string_index->key), p_string_index); \
                 P_DATA_FRAME_DATA->row_cnt++; \
@@ -124,7 +124,7 @@
 
 
 #define _PROCESS_VALUE(P_DATA_FRAME_INFO, ITER, P_MONGO_DATA, P_INDEX_IDX, P_COLUMN_IDX, STRING_VALUE_MAX_LENGTHS) \
-    for (unsigned int value_idx = 0; value_idx < P_DATA_FRAME_INFO->value_cnt; value_idx++) { \
+    for (value_idx = 0; value_idx < P_DATA_FRAME_INFO->value_cnt; value_idx++) { \
         if (bson_iter_init (&ITER, doc) && bson_iter_find (&ITER, P_DATA_FRAME_INFO->value_keys[value_idx])) { \
             if (P_DATA_FRAME_INFO->value_types[value_idx] == BSON_TYPE_UNKNOWN) { \
                 P_DATA_FRAME_INFO->value_types[value_idx] = bson_iter_type(&ITER); \

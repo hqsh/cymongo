@@ -22,12 +22,13 @@ table_t * init_table (unsigned int column_cnt) {
         memset (p_table->COLUMNS[idx], NAN_VALUE, sizeof(TYPE) * p_table->row_cnt); \
     } \
     else { \
-        for (uint64_t i = 0; i < p_table->row_cnt; i++) { \
+        uint64_t i; \
+        for (i = 0; i < p_table->row_cnt; i++) { \
             memcpy (p_table->COLUMNS[idx] + i, &NAN_VALUE, sizeof(TYPE)); \
         } \
     } \
-    NODE_T *p_last_node; \
-    for (NODE_T *p_node = p_node_chain_heads->NODE_CHAIN_HEADS[idx]; p_node; ) { \
+    NODE_T *p_node, *p_last_node; \
+    for (p_node = p_node_chain_heads->NODE_CHAIN_HEADS[idx]; p_node; ) { \
         p_table->COLUMNS[idx][p_node->idx] = p_node->data; \
         p_last_node = p_node; \
         p_node = p_node->next; \
@@ -35,15 +36,16 @@ table_t * init_table (unsigned int column_cnt) {
     }
 
 void create_table_array (table_info_t *p_table_info, node_chain_heads_t *p_node_chain_heads, table_t *p_table, default_nan_value_t *p_default_nan_value) {
-    for (unsigned int idx = 0; idx < p_table_info->column_cnt; idx++) {
+    unsigned int idx;
+    for (idx = 0; idx < p_table_info->column_cnt; idx++) {
         int column_type = p_table_info->column_types[idx];
         if (column_type == BSON_TYPE_UTF8) {
             uint64_t max_length = p_table->string_column_max_lengths[idx];
             uint64_t mem_size = sizeof(bson_unichar_t) * p_table->row_cnt * max_length;
             p_table->string_columns[idx] = (bson_unichar_t *) malloc (mem_size);
             memset (p_table->string_columns[idx], 0, mem_size);
-            string_node_t *p_last_node;
-            for (string_node_t *p_node = p_node_chain_heads->string_node_chain_heads[idx]; p_node; ) {
+            string_node_t *p_node, *p_last_node;
+            for (p_node = p_node_chain_heads->string_node_chain_heads[idx]; p_node; ) {
                 memcpy (p_table->string_columns[idx] + p_node->idx * max_length,
                     p_node->data.string, p_node->data.length * sizeof(bson_unichar_t));
                 p_last_node = p_node;

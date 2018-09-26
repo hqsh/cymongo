@@ -1,10 +1,10 @@
 #ifndef BASIC_OPERATION_C
 #define BASIC_OPERATION_C
-
 #include "cymongo_type.h"
 #include "error_code.h"
 #include <bcon.h>
 #include <string.h>
+
 
 #define _CHAR_STRING_TO_UNI_CHAR_STRING(CHAR_STRING, UNI_CHAR_STRING, UNI_STRING_LENGTH) \
     bson_unichar_t __uni_char; \

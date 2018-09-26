@@ -379,29 +379,32 @@ class CyMongoCollection(CyMongo):
                 filter = self.to_bytes(json.dumps(filter), 'filter')
             elif isinstance(filter, str):
                 filter = self.to_bytes(filter, 'filter')
-            data_frame_data = self.mongoc_api.find_as_data_frame(
-                    self.__mongoc_collection, pointer(self.__nan_process_method),
-                    pointer(self.__data_frame_info), filter, self.__options, self.__debug)
-            if self.__debug:
-                self.logger.debug('get_data_from_c cost: {}'.format(time.time() - begin))
-            index = self.__get_index_or_column(data_frame_data, 'index')
-            index = pd.Index(index, name=self.__index_key)
-            if self.__debug:
-                self.logger.debug('get df index cost: {}'.format(time.time() - begin))
-                self.logger.debug(index)
-            column = self.__get_index_or_column(data_frame_data, 'column')
-            column = pd.Index(column, name=self.__column_key)
-            if self.__debug:
-                self.logger.debug('get df column cost: {}'.format(time.time() - begin))
-                self.logger.debug(column)
-            values = self.__get_values(data_frame_data)
-            if self.__debug:
-                self.logger.debug('get df values cost: {}'.format(time.time() - begin))
-            dfs = OrderedDict()
-            for value_key, value in values.items():
-                dfs[value_key] = pd.DataFrame(value, index=index, columns=column)
-            if self.__debug:
-                self.logger.debug('create dfs cost: {}'.format(time.time() - begin))
+            try:
+                data_frame_data = self.mongoc_api.find_as_data_frame(
+                        self.__mongoc_collection, pointer(self.__nan_process_method),
+                        pointer(self.__data_frame_info), filter, self.__options, self.__debug)
+                if self.__debug:
+                    self.logger.debug('get_data_from_c cost: {}'.format(time.time() - begin))
+                index = self.__get_index_or_column(data_frame_data, 'index')
+                index = pd.Index(index, name=self.__index_key)
+                if self.__debug:
+                    self.logger.debug('get df index cost: {}'.format(time.time() - begin))
+                    self.logger.debug(index)
+                column = self.__get_index_or_column(data_frame_data, 'column')
+                column = pd.Index(column, name=self.__column_key)
+                if self.__debug:
+                    self.logger.debug('get df column cost: {}'.format(time.time() - begin))
+                    self.logger.debug(column)
+                values = self.__get_values(data_frame_data)
+                if self.__debug:
+                    self.logger.debug('get df values cost: {}'.format(time.time() - begin))
+                dfs = OrderedDict()
+                for value_key, value in values.items():
+                    dfs[value_key] = pd.DataFrame(value, index=index, columns=column)
+                if self.__debug:
+                    self.logger.debug('create dfs cost: {}'.format(time.time() - begin))
+            except:
+                return
             return dfs
         if return_type == 'table':
             if isinstance(filter, dict):

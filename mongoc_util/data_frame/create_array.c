@@ -85,8 +85,9 @@
         memset (p_data_frame_data->VALUE_ARRAYS[value_idx], NAN_VALUE, mem_size); \
     } \
     else { \
-        for (uint64_t i = 0; i < data_frame_size; i++) { \
-            memcpy (p_data_frame_data->VALUE_ARRAYS[value_idx] + i, &NAN_VALUE, sizeof(TYPE)); \
+        uint64_t j; \
+        for (j = 0; j < data_frame_size; j++) { \
+            memcpy (p_data_frame_data->VALUE_ARRAYS[value_idx] + j, &NAN_VALUE, sizeof(TYPE)); \
         } \
     } \
     VALUE_NODE_T *p_node, *p_last_node; \
@@ -99,11 +100,12 @@
 
 
 void create_value_array (data_frame_info_t *p_data_frame_info, mongo_data_t *p_mongo_data, data_frame_data_t *p_data_frame_data, default_nan_value_t *p_default_nan_value) {
+    unsigned int value_idx;
     uint64_t row_cnt = p_data_frame_data->row_cnt;
     uint64_t col_cnt = p_data_frame_data->col_cnt;
     uint64_t data_frame_size = row_cnt * col_cnt;
     uint64_t mem_size, row_item_cnt, uni_char_string_length;
-    for (unsigned int value_idx = 0; value_idx < p_data_frame_info->value_cnt; value_idx++) {
+    for (value_idx = 0; value_idx < p_data_frame_info->value_cnt; value_idx++) {
         if (p_data_frame_info->value_types[value_idx] == BSON_TYPE_UTF8) {
             uni_char_string_length = p_data_frame_data->string_value_max_lengths[value_idx];
             row_item_cnt = uni_char_string_length * col_cnt;

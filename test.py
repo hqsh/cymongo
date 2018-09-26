@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 import time
 import unittest
+import psutil
+import os
 
 
 @with_logger
@@ -13,7 +15,7 @@ class CymongoTest(unittest.TestCase):
     mongo_uri = 'mongodb://hqs:f@localhost:27017/test'
     db = 'test'
     enable_debug = False
-    test_mode = 'memory_leak'  # function, performance or memory_leak
+    test_mode = 'function'  # function, performance, table_memory_leak or data_frame_memory_leak
     index_name = 'date_time'
     column_name = 'blogger_id'
     value_names = [  # 'signature', 'last_logged_date_time'
@@ -172,16 +174,41 @@ class CymongoTest(unittest.TestCase):
             self.pymongo_filter = self.cymongo_filter = {}
             self.run_test()
 
-    def test_find_memory_leak(self):
-        if self.test_mode == 'memory_leak':
-            self.logger.info('================================= test_find_memory_leak ================================')
-            self.is_test_memory_leak = True
+    def test_memory_leak(self):
+        if self.test_mode in ['table_memory_leak', 'data_frame_memory_leak']:
+            self.logger.info('=================================== test_memory_leak ===================================')
             self.pymongo_find_need_fillna_astype = False
             self.collection = 'cymongo_1000_4000'
             self.pymongo_filter = self.cymongo_filter = {}
             for cnt in range(1, 10001):
-                self.run_test('data_frame')
-                print('test_find_memory_leak, run {} times finished.'.format(cnt))
+                self.run_test(self.test_mode[: -len('_memory_leak')])
+                print('test_memory_leak, run {} times finished.'.format(cnt))
+                print('memory used: {}, memory used percent: {}.'.format(psutil.Process(os.getpid()).memory_info().rss,
+                      psutil.virtual_memory().percent))
+
+    # def test_find_data_table_memory_leak(self):
+    #     if self.test_mode == 'table_memory_leak':
+    #         self.logger.info('============================== test_find_data_table_leak ===============================')
+    #         self.pymongo_find_need_fillna_astype = False
+    #         self.collection = 'cymongo_1000_4000'
+    #         self.pymongo_filter = self.cymongo_filter = {}
+    #         for cnt in range(1, 10001):
+    #             self.run_test('table')
+    #             print('test_find_data_table_memory_leak, run {} times finished.'.format(cnt))
+    #             print('memory used: {}, memory used percent: {}.'.format(psutil.Process(os.getpid()).memory_info().rss),
+    #                   psutil.virtual_memory().percent)
+    #
+    # def test_find_data_frame_memory_leak(self):
+    #     if self.test_mode == 'data_frame_memory_leak':
+    #         self.logger.info('=========================== test_find_data_frame_memory_leak ===========================')
+    #         self.pymongo_find_need_fillna_astype = False
+    #         self.collection = 'cymongo_1000_4000'
+    #         self.pymongo_filter = self.cymongo_filter = {}
+    #         for cnt in range(1, 10001):
+    #             self.run_test('data_frame')
+    #             print('test_find_data_frame_memory_leak, run {} times finished.'.format(cnt))
+    #             print('memory used: {}, memory used percent: {}.'.format(psutil.Process(os.getpid()).memory_info().rss),
+    #                   psutil.virtual_memory().percent)
 
     def test_find_slice_col(self):
         if self.test_mode == 'function':
@@ -225,4 +252,5 @@ class CymongoTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
+    CymongoTest.test_mode = 'data_frame_memory_leak'
     unittest.main()

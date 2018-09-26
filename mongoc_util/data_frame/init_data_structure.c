@@ -1,5 +1,6 @@
 #include <stdio.h>
 
+
 // init mongo_data_t for "find" function
 mongo_data_t * init_mongo_data (unsigned int value_cnt) {
     unsigned int i;
@@ -11,7 +12,7 @@ mongo_data_t * init_mongo_data (unsigned int value_cnt) {
     p_mongo_data->date_time_value_chain_heads = (date_time_value_node_t **) malloc (sizeof(date_time_value_node_t *) * value_cnt);
     p_mongo_data->float64_value_chain_heads = (float64_value_node_t **) malloc (sizeof(float64_value_node_t *) * value_cnt);
     p_mongo_data->bool_value_chain_heads = (bool_value_node_t **) malloc (sizeof(bool_value_node_t *) * value_cnt);
-    for (unsigned int i = 0; i < value_cnt; i++) {
+    for (i = 0; i < value_cnt; i++) {
         p_mongo_data->string_value_chain_heads[i] = NULL;
         p_mongo_data->int32_value_chain_heads[i] = NULL;
         p_mongo_data->int64_value_chain_heads[i] = NULL;

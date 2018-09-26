@@ -30,6 +30,7 @@ void close_client (mongoc_client_pool_t *pool, mongoc_client_t *client)
         mongoc_client_pool_push (pool, client);
     }
     mongoc_client_destroy(client);
+    mongoc_cleanup();
 }
 
 
@@ -38,14 +39,16 @@ mongoc_client_t * get_client (const char *mongoc_uri, mongoc_client_pool_t *pool
     mongoc_uri_t *uri;
     mongoc_client_t *client;
     bson_error_t error;
-    mongoc_init ();
     if (pool == NULL) {
+        mongoc_init ();
         uri = mongoc_uri_new_with_error (mongoc_uri, &error);
         if (!uri) {
             *error_code = ILLEGAL_MONGOC_URI_ERROR_CODE;
+            free (uri);
             return NULL;
         }
         client = mongoc_client_new_from_uri (uri);
+        free (uri);
     }
     else {
         client = mongoc_client_pool_pop (pool);
@@ -84,6 +87,7 @@ data_frame_data_t * find_as_data_frame (mongoc_collection_t *collection, default
     date_time_index_t *p_date_time_index, *p_tmp_date_time_index;
     float64_index_t *p_float64_index, *p_tmp_float64_index;
     bool_index_t *p_bool_index, *p_tmp_bool_index;
+    unsigned int value_idx;
     unsigned int i;
     void * p_this_node;
     bool b;
@@ -97,7 +101,8 @@ data_frame_data_t * find_as_data_frame (mongoc_collection_t *collection, default
         printf ("the index of DataFrame: %s %d\nthe column of DataFrame: %s %d\n", data_frame_info->index_key,
             data_frame_info->index_type, data_frame_info->column_key, data_frame_info->column_type);
         printf ("the values of DataFrame:\n");
-        for (unsigned int value_idx = 0; value_idx < data_frame_info->value_cnt; value_idx++) {
+        unsigned int value_idx;
+        for (value_idx = 0; value_idx < data_frame_info->value_cnt; value_idx++) {
             printf ("%s %d\n", data_frame_info->value_keys[value_idx], data_frame_info->value_types[value_idx]);
         }
     }
@@ -176,6 +181,7 @@ table_t * find_as_table (mongoc_collection_t *collection, default_nan_value_t* p
     date_time_node_t *p_date_time_node;
     float64_node_t *p_float64_node;
     bool_node_t *p_bool_node;
+    unsigned int column_idx;
     uint64_t row_cnt;
     unsigned int column_cnt = p_table_info->column_cnt;
     void * p_this_node;
@@ -190,7 +196,7 @@ table_t * find_as_table (mongoc_collection_t *collection, default_nan_value_t* p
     p_node_chain_heads = init_node_chain_heads_t (column_cnt);
     p_table = init_table (column_cnt);
     for (row_cnt = 0; mongoc_cursor_next (cursor, &doc); row_cnt++) {
-        for (unsigned int column_idx = 0; column_idx < column_cnt; column_idx++) {
+        for (column_idx = 0; column_idx < column_cnt; column_idx++) {
             if (bson_iter_init (&iter, doc) && bson_iter_find (&iter, p_table_info->column_names[column_idx])) {
                 bson_type = p_table_info->column_types[column_idx];
                 if (bson_type == BSON_TYPE_UNKNOWN) {
