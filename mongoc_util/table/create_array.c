@@ -12,6 +12,7 @@ table_t * init_table (unsigned int column_cnt) {
     memset (p_table->int32_columns, 0, sizeof(int32_t *) * column_cnt);
     memset (p_table->int64_columns, 0, sizeof(int64_t *) * column_cnt);
     memset (p_table->date_time_columns, 0, sizeof(int64_t *) * column_cnt);
+    memset (p_table->float64_columns, 0, sizeof(int64_t *) * column_cnt);
     memset (p_table->bool_columns, 0, sizeof(float64_t *) * column_cnt);
     return p_table;
 }
@@ -77,4 +78,5 @@ void create_table_array (table_info_t *p_table_info, node_chain_heads_t *p_node_
     free (p_node_chain_heads->date_time_node_chain_heads);
     free (p_node_chain_heads->float64_node_chain_heads);
     free (p_node_chain_heads->bool_node_chain_heads);
+    free (p_node_chain_heads);
 }

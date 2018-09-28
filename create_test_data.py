@@ -15,6 +15,7 @@ if __name__ == '__main__':
     client = MongoClient('mongodb://hqs:f@localhost:27017/test')
     db = client['test']
     collections = {'cymongo': (10, 5), 'cymongo_1000_4000': (1000, 4000), 'cymongo_nan': (3, 3)}
+    # collections = {'cymongo_1000_4000_int_blogger_id': (1000, 4000)}
     for collection_name, (row_cnt, col_cnt) in collections.items():
         print('create collection "{}" start.'.format(collection_name))
         collection = db[collection_name]

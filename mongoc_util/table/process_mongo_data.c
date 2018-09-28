@@ -1,4 +1,5 @@
-node_chain_heads_t * init_node_chain_heads_t (unsigned int column_cnt) {
+node_chain_heads_t * init_node_chain_heads_t (unsigned int column_cnt)
+{
     node_chain_heads_t *p_node_chain_heads = (node_chain_heads_t *) malloc (sizeof(node_chain_heads_t));
     p_node_chain_heads->string_node_chain_heads = (string_node_t **) malloc (sizeof(string_node_t *) * column_cnt);
     p_node_chain_heads->int32_node_chain_heads = (int32_node_t **) malloc (sizeof(int32_node_t *) * column_cnt);

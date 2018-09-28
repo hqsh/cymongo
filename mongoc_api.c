@@ -7,6 +7,7 @@
 #include "mongoc_util/data_frame/free_memory.c"
 #include "mongoc_util/table/process_mongo_data.c"
 #include "mongoc_util/table/create_array.c"
+#include "mongoc_util/table/free_memory.c"
 #include <time.h>
 
 
@@ -17,10 +18,13 @@ mongoc_client_pool_t * get_pool (const char *mongoc_uri, int *error_code) {
     mongoc_init ();
     uri = mongoc_uri_new_with_error (mongoc_uri, &error);
     if (!uri) {
+        free (uri);
         *error_code = ILLEGAL_MONGOC_URI_ERROR_CODE;
         return NULL;
     }
-    return mongoc_client_pool_new (uri);
+    mongoc_client_pool_t *p_mongoc_client_pool = mongoc_client_pool_new (uri);
+    free (uri);
+    return p_mongoc_client_pool;
 }
 
 
@@ -29,8 +33,20 @@ void close_client (mongoc_client_pool_t *pool, mongoc_client_t *client)
     if (pool != NULL) {
         mongoc_client_pool_push (pool, client);
     }
-    mongoc_client_destroy(client);
+    mongoc_client_destroy (client);
     mongoc_cleanup();
+}
+
+
+void close_database (mongoc_database_t *database)
+{
+    mongoc_database_destroy (database);
+}
+
+
+void close_collection (mongoc_collection_t *collection)
+{
+    mongoc_collection_destroy (collection);
 }
 
 
@@ -43,8 +59,8 @@ mongoc_client_t * get_client (const char *mongoc_uri, mongoc_client_pool_t *pool
         mongoc_init ();
         uri = mongoc_uri_new_with_error (mongoc_uri, &error);
         if (!uri) {
-            *error_code = ILLEGAL_MONGOC_URI_ERROR_CODE;
             free (uri);
+            *error_code = ILLEGAL_MONGOC_URI_ERROR_CODE;
             return NULL;
         }
         client = mongoc_client_new_from_uri (uri);
@@ -113,7 +129,12 @@ data_frame_data_t * find_as_data_frame (mongoc_collection_t *collection, default
     else {
         query = bson_new_from_json ((uint8_t *) filter, strlen(filter), NULL);
     }
-    opts = bson_new_from_json ((uint8_t *) options, strlen(options), NULL);
+    if (options == NULL) {
+        opts = NULL;
+    }
+    else {
+        opts = bson_new_from_json ((uint8_t *) options, strlen(options), NULL);
+    }
     cursor = mongoc_collection_find_with_opts (collection, query, opts, NULL);
     while (mongoc_cursor_next (cursor, &doc)) {
         b = bson_iter_init (&index_iter, doc) && bson_iter_find (&index_iter, data_frame_info->index_key) &&
@@ -123,6 +144,9 @@ data_frame_data_t * find_as_data_frame (mongoc_collection_t *collection, default
             _PROCESS_INDEX_OR_COLUMN (false, column_type, column_iter, p_mongo_data, p_mongo_data->string_column_max_length, p_column_idx, p_data_frame_data)
             _PROCESS_VALUE (data_frame_info, value_iter, p_mongo_data, p_index_idx, p_column_idx, p_data_frame_data->string_value_max_lengths)
         }
+    }
+    if (cursor != NULL) {
+        mongoc_cursor_destroy (cursor);
     }
     if (debug) {
         printf ("find_as_data_frame step 2 [process_mongo_data], cost: %f\n", (clock() - begin_time) / 1000000.0);
@@ -152,7 +176,7 @@ data_frame_data_t * find_as_data_frame (mongoc_collection_t *collection, default
         printf ("find_as_data_frame step 5 [create_value_array], cost: %f\n", (clock() - begin_time) / 1000000.0);
     }
     // free memory
-    free_data_frame_memory (p_mongo_data);
+    free_data_frame_hash (p_mongo_data);
     if (debug) {
         printf ("find_as_data_frame step 6 [free_memory], cost: %f\n", (clock() - begin_time) / 1000000.0);
     }
@@ -191,7 +215,12 @@ table_t * find_as_table (mongoc_collection_t *collection, default_nan_value_t* p
     else {
         query = bson_new_from_json ((uint8_t *) filter, strlen(filter), NULL);
     }
-    opts = bson_new_from_json ((uint8_t *) options, strlen(options), NULL);
+    if (options == NULL) {
+        opts = NULL;
+    }
+    else {
+        opts = bson_new_from_json ((uint8_t *) options, strlen(options), NULL);
+    }
     cursor = mongoc_collection_find_with_opts (collection, query, opts, NULL);
     p_node_chain_heads = init_node_chain_heads_t (column_cnt);
     p_table = init_table (column_cnt);
@@ -213,6 +242,9 @@ table_t * find_as_table (mongoc_collection_t *collection, default_nan_value_t* p
                 _PROCESS_TABLE (iter, bson_type, column_idx, row_cnt)
             }
         }
+    }
+    if (cursor != NULL) {
+        mongoc_cursor_destroy (cursor);
     }
     bson_destroy (query);
     bson_destroy (opts);

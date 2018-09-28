@@ -6,6 +6,7 @@ import pandas as pd
 import json
 import datetime
 import time
+import gc
 
 
 class CyMongo:
@@ -110,11 +111,15 @@ class CyMongoClient(CyMongo):
         else:
             self.__mongoc_client_pool, self.__mongoc_client = None, None
         self.__use_client_pool = use_client_pool
+        self.__cymongo_dbs = []
         self.__is_closed = False
 
     @property
     def is_closed(self):
         return self.__is_closed
+
+    def add_cymongo_db(self, cymongo_db):
+        self.__cymongo_dbs.append(cymongo_db)
 
     @staticmethod
     def __check_error_code(error_code):
@@ -137,9 +142,14 @@ class CyMongoClient(CyMongo):
         if self.__is_closed:
             raise CyMongoClientIsClosedException
         self.__is_closed = True
+        for cymongo_db in self.__cymongo_dbs:
+            for cymongo_collection in cymongo_db.cymongo_collections:
+                self.mongoc_api.close_collection(cymongo_collection.mongoc_collection)
+            self.mongoc_api.close_database(cymongo_db.mongoc_db)
         self.mongoc_api.close_client(self.__mongoc_client_pool, self.__mongoc_client)
         self.__mongoc_client_pool = None
         self.__mongoc_client = None
+        gc.collect()
 
     def __getitem__(self, db_name):
         if self.__is_closed:
@@ -160,11 +170,24 @@ class CyMongoDatabase(CyMongo):
             self.__mongoc_client_pool = mongoc_client_pool
         self.__db_name = self.to_bytes(db_name, 'db_name')
         self.__mongoc_db = self.mongoc_api.get_database(self.__mongoc_client, self.__db_name)
+        self.__cymongo_collections = []
+        cymongo_client.add_cymongo_db(self)
+
+    @property
+    def mongoc_db(self):
+        return self.__mongoc_db
+
+    @property
+    def cymongo_collections(self):
+        return self.__cymongo_collections
+
+    def add_cymongo_collection(self, cymongo_collection):
+        self.__cymongo_collections.append(cymongo_collection)
 
     def __getitem__(self, collection_name):
         if self.__cymongo_client.is_closed:
             raise CyMongoClientIsClosedException
-        return CyMongoCollection(self.__cymongo_client, self.__mongoc_client, self.__db_name, collection_name,
+        return CyMongoCollection(self, self.__cymongo_client, self.__mongoc_client, self.__db_name, collection_name,
                                  self.__mongoc_client_pool)
 
 
@@ -182,7 +205,7 @@ class CyMongoCollection(CyMongo):
     __default_date_time_nan_value = 0
     __default_bool_value = False
 
-    def __init__(self, cymongo_client, mongoc_client, db_name, collection_name, mongoc_client_pool=None):
+    def __init__(self, cymongo_db, cymongo_client, mongoc_client, db_name, collection_name, mongoc_client_pool=None):
         self.__cymongo_client = cymongo_client
         self.__mongoc_client = mongoc_client
         self.__db_name = self.to_bytes(db_name, 'db_name')
@@ -191,7 +214,7 @@ class CyMongoCollection(CyMongo):
                                                                   self.__collection_name)
         self.__index_key = None
         self.__column_key = None
-        self.__value_keys = None
+        self.__value_keys = []
         self.__data_frame_info = None
         self.__column_names = None
         self.__table_info = None
@@ -206,6 +229,11 @@ class CyMongoCollection(CyMongo):
             c_bool(self.__default_bool_value)  # default_bool_value
         )
         self.__mongoc_client_pool = mongoc_client_pool
+        cymongo_db.add_cymongo_collection(self)
+
+    @property
+    def mongoc_collection(self):
+        return self.__mongoc_collection
 
     @classmethod
     def bson_type_to_type(cls, bson_type):
@@ -302,12 +330,13 @@ class CyMongoCollection(CyMongo):
             if ctype_array:
                 if array_type == 'string':
                     str_len = getattr(data_frame_data.contents, 'string_{}_max_length'.format(index_or_column))
-                    numpy_array = np.ctypeslib.as_array(ctype_array, shape=(data_frame_data.contents.col_cnt, str_len))
+                    numpy_array = np.ctypeslib.as_array(
+                            ctype_array, shape=(data_frame_data.contents.col_cnt, str_len)).copy()
                     numpy_array.dtype = 'U{}'.format(str_len)
                     numpy_array.shape = (numpy_array.shape[0], )
                     return numpy_array
                 return np.ctypeslib.as_array(ctype_array, shape=(
-                    getattr(data_frame_data.contents, 'row_cnt' if index_or_column == 'index' else 'col_cnt'), ))
+                    getattr(data_frame_data.contents, 'row_cnt' if index_or_column == 'index' else 'col_cnt'), )).copy()
 
     @classmethod
     def __get_offset_c_pointer(cls, c_pointer, offset):
@@ -338,12 +367,12 @@ class CyMongoCollection(CyMongo):
             if array_type == 'string':
                 string_max_length = self.__get_offset_c_pointer(
                     data_frame_data.contents.string_value_max_lengths, value_idx).contents.value
-                value_array = np.ctypeslib.as_array(c_array_p, shape=(row_cnt, col_cnt, string_max_length))
+                value_array = np.ctypeslib.as_array(c_array_p, shape=(row_cnt, col_cnt, string_max_length)).copy()
                 value_array.dtype = 'U{}'.format(string_max_length)
                 value_array.shape = (value_array.shape[0], value_array.shape[1])
                 values[value_key] = value_array
             elif array_type in self.__supported_number_types:
-                value_array = np.ctypeslib.as_array(c_array_p, shape=(row_cnt, col_cnt))
+                value_array = np.ctypeslib.as_array(c_array_p, shape=(row_cnt, col_cnt)).copy()
                 value_array = self.__transfer_int_array_with_nan_to_float_array(value_array)
                 values[value_key] = value_array
             else:
@@ -361,11 +390,11 @@ class CyMongoCollection(CyMongo):
             if c_array:
                 if dtype == 'string':
                     max_length = c_table.contents.string_column_max_lengths[idx]
-                    array = np.ctypeslib.as_array(c_array, shape=(c_table.contents.row_cnt, max_length))
+                    array = np.ctypeslib.as_array(c_array, shape=(c_table.contents.row_cnt, max_length)).copy()
                     array.dtype = 'U{}'.format(max_length)
                     array.shape = (array.shape[0], )
                 else:
-                    array = np.ctypeslib.as_array(c_array, shape=(c_table.contents.row_cnt, ))
+                    array = np.ctypeslib.as_array(c_array, shape=(c_table.contents.row_cnt, )).copy()
                     array = self.__transfer_int_array_with_nan_to_float_array(array)
                 table[self.__column_names[idx]] = array
         return table
@@ -379,6 +408,7 @@ class CyMongoCollection(CyMongo):
                 filter = self.to_bytes(json.dumps(filter), 'filter')
             elif isinstance(filter, str):
                 filter = self.to_bytes(filter, 'filter')
+            data_frame_data = None
             try:
                 data_frame_data = self.mongoc_api.find_as_data_frame(
                         self.__mongoc_collection, pointer(self.__nan_process_method),
@@ -401,10 +431,13 @@ class CyMongoCollection(CyMongo):
                 dfs = OrderedDict()
                 for value_key, value in values.items():
                     dfs[value_key] = pd.DataFrame(value, index=index, columns=column)
+            except:
+                dfs = None
+            finally:
+                if data_frame_data is not None:
+                    self.mongoc_api.free_data_frame_memory(data_frame_data, c_uint(len(self.__value_keys)))
                 if self.__debug:
                     self.logger.debug('create dfs cost: {}'.format(time.time() - begin))
-            except:
-                return
             return dfs
         if return_type == 'table':
             if isinstance(filter, dict):
@@ -420,6 +453,7 @@ class CyMongoCollection(CyMongo):
             if self.__debug:
                 self.logger.debug('transfer data into dict cost: {}'.format(time.time() - begin))
             df = pd.DataFrame(table)
+            self.mongoc_api.free_table_memory(c_table, c_uint(self.__table_info.column_cnt))
             if self.__debug:
                 self.logger.debug('create df cost: {}'.format(time.time() - begin))
             return df

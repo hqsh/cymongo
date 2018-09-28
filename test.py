@@ -31,8 +31,8 @@ class CymongoTest(unittest.TestCase):
     default_bool_value = False
     use_client_pool = True
     pymongo_find_need_fillna_astype = False
-    value_dtypes = {'daily_visitor_cnt': np.int64, 'fan_cnt': np.int64, 'last_logged_date_time': np.int64,
-                    'blog_updated': np.bool}
+    value_dtypes_for_pymongo = {'daily_visitor_cnt': np.int64, 'fan_cnt': np.int64, 'last_logged_date_time': np.int64,
+                                'blog_updated': np.bool}
     default_nan_values = {'daily_visitor_cnt': default_int64_nan_value, 'fan_cnt': default_int64_nan_value,
                           'last_logged_date_time': default_date_time_nan_value, 'blog_updated': default_bool_value}
 
@@ -66,22 +66,23 @@ class CymongoTest(unittest.TestCase):
         self.logger.info('step 4: unstack: {}'.format(time.time() - begin))
         if self.pymongo_find_need_fillna_astype:
             for col_name in table.columns:
-                if col_name in self.value_dtypes:
+                if col_name in self.value_dtypes_for_pymongo:
                     # fillna and astype for table
-                    if self.keep_int_when_has_nan_value and table[col_name].values.dtype != self.value_dtypes[col_name]:
+                    if self.keep_int_when_has_nan_value and table[col_name].values.dtype != \
+                            self.value_dtypes_for_pymongo[col_name]:
                         arr = table[col_name].values.copy()
                         arr[np.isnan(arr)] = self.default_nan_values[col_name]
-                        arr = arr.astype(self.value_dtypes[col_name])
+                        arr = arr.astype(self.value_dtypes_for_pymongo[col_name])
                         table[col_name] = arr
                     # fillna and astype for df
-                    if self.value_dtypes[col_name] is np.bool or self.keep_int_when_has_nan_value and \
-                                    df[col_name].values.dtype != self.value_dtypes[col_name]:
+                    if self.value_dtypes_for_pymongo[col_name] is np.bool or self.keep_int_when_has_nan_value and \
+                                    df[col_name].values.dtype != self.value_dtypes_for_pymongo[col_name]:
                         arr = df[col_name].values.copy()
-                        if self.value_dtypes[col_name] is np.bool:
+                        if self.value_dtypes_for_pymongo[col_name] is np.bool:
                             arr[arr == None] = self.default_nan_values[col_name]
                         else:
                             arr[np.isnan(arr)] = self.default_nan_values[col_name]
-                        arr = arr.astype(self.value_dtypes[col_name])
+                        arr = arr.astype(self.value_dtypes_for_pymongo[col_name])
                         df[col_name] = arr
         return table, df
 
@@ -186,30 +187,6 @@ class CymongoTest(unittest.TestCase):
                 print('memory used: {}, memory used percent: {}.'.format(psutil.Process(os.getpid()).memory_info().rss,
                       psutil.virtual_memory().percent))
 
-    # def test_find_data_table_memory_leak(self):
-    #     if self.test_mode == 'table_memory_leak':
-    #         self.logger.info('============================== test_find_data_table_leak ===============================')
-    #         self.pymongo_find_need_fillna_astype = False
-    #         self.collection = 'cymongo_1000_4000'
-    #         self.pymongo_filter = self.cymongo_filter = {}
-    #         for cnt in range(1, 10001):
-    #             self.run_test('table')
-    #             print('test_find_data_table_memory_leak, run {} times finished.'.format(cnt))
-    #             print('memory used: {}, memory used percent: {}.'.format(psutil.Process(os.getpid()).memory_info().rss),
-    #                   psutil.virtual_memory().percent)
-    #
-    # def test_find_data_frame_memory_leak(self):
-    #     if self.test_mode == 'data_frame_memory_leak':
-    #         self.logger.info('=========================== test_find_data_frame_memory_leak ===========================')
-    #         self.pymongo_find_need_fillna_astype = False
-    #         self.collection = 'cymongo_1000_4000'
-    #         self.pymongo_filter = self.cymongo_filter = {}
-    #         for cnt in range(1, 10001):
-    #             self.run_test('data_frame')
-    #             print('test_find_data_frame_memory_leak, run {} times finished.'.format(cnt))
-    #             print('memory used: {}, memory used percent: {}.'.format(psutil.Process(os.getpid()).memory_info().rss),
-    #                   psutil.virtual_memory().percent)
-
     def test_find_slice_col(self):
         if self.test_mode == 'function':
             self.logger.info('==================================== test_slice_col ====================================')
@@ -252,5 +229,5 @@ class CymongoTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    CymongoTest.test_mode = 'data_frame_memory_leak'
+    # CymongoTest.test_mode = 'data_frame_memory_leak'
     unittest.main()

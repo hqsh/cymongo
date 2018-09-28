@@ -29,15 +29,15 @@
         if (MAX_STRING_LENGTH < length) { \
             MAX_STRING_LENGTH = length; \
         } \
-        char *str_data = (char *) malloc (strlen(string_data) + 1); \
-        memcpy (str_data, string_data, strlen(string_data) + 1); \
         if (IS_INDEX) { \
-            HASH_FIND_STR (P_MONGO_DATA->string_index_head, str_data, p_string_index); \
+            HASH_FIND_STR (P_MONGO_DATA->string_index_head, string_data, p_string_index); \
         } \
         else { \
-            HASH_FIND_STR (P_MONGO_DATA->string_column_head, str_data, p_string_index); \
+            HASH_FIND_STR (P_MONGO_DATA->string_column_head, string_data, p_string_index); \
         } \
         if (!p_string_index) { \
+            char *str_data = (char *) malloc (strlen(string_data) + 1); \
+            memcpy (str_data, string_data, strlen(string_data) + 1); \
             p_string_index = (string_index_t *) malloc (sizeof(string_index_t)); \
             memset (p_string_index, 0, sizeof(string_index_t)); \
             p_string_index->key = str_data; \
@@ -63,12 +63,12 @@
         } \
     } \
     else if (data_frame_info->TYPE == BSON_TYPE_INT64 && !is_int64) { \
-        int32_data = bson_iter_int32 (&ITER); \
+        int64_data = bson_iter_int32 (&ITER); \
         if (IS_INDEX) { \
-            __PROCESS_NUMBER_INDEX_OR_COLUMN (int64_t, int64_index_t, int64_index_head, p_int64_index, int32_data, P_IDX, P_DATA_FRAME_DATA->row_cnt) \
+            __PROCESS_NUMBER_INDEX_OR_COLUMN (int64_t, int64_index_t, int64_index_head, p_int64_index, int64_data, P_IDX, P_DATA_FRAME_DATA->row_cnt) \
         } \
         else { \
-            __PROCESS_NUMBER_INDEX_OR_COLUMN (int64_t, int64_index_t, int64_index_head, p_int64_index, int32_data, P_IDX, P_DATA_FRAME_DATA->col_cnt) \
+            __PROCESS_NUMBER_INDEX_OR_COLUMN (int64_t, int64_index_t, int64_column_head, p_int64_index, int64_data, P_IDX, P_DATA_FRAME_DATA->col_cnt) \
         } \
     } \
     else if (data_frame_info->TYPE == BSON_TYPE_INT64 && is_int64) { \

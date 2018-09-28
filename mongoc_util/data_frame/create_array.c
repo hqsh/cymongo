@@ -122,20 +122,20 @@ void create_value_array (data_frame_info_t *p_data_frame_info, mongo_data_t *p_m
             }
         }
         else if (p_data_frame_info->value_types[value_idx] == BSON_TYPE_INT32) {
-            __CREATE_NUMBER_VALUE_ARRAY(int32_t, int32_value_arrays, int32_value_node_t, int32_value_chain_heads, p_default_nan_value->default_int32_nan_value, false)
+            __CREATE_NUMBER_VALUE_ARRAY (int32_t, int32_value_arrays, int32_value_node_t, int32_value_chain_heads, p_default_nan_value->default_int32_nan_value, false)
         }
         else if (p_data_frame_info->value_types[value_idx] == BSON_TYPE_INT64) {
-            __CREATE_NUMBER_VALUE_ARRAY(int64_t, int64_value_arrays, int64_value_node_t, int64_value_chain_heads, p_default_nan_value->default_int64_nan_value, false)
+            __CREATE_NUMBER_VALUE_ARRAY (int64_t, int64_value_arrays, int64_value_node_t, int64_value_chain_heads, p_default_nan_value->default_int64_nan_value, false)
         }
         else if (p_data_frame_info->value_types[value_idx] == BSON_TYPE_DATE_TIME) {
-            __CREATE_NUMBER_VALUE_ARRAY(date_time_t, date_time_value_arrays, date_time_value_node_t, date_time_value_chain_heads, p_default_nan_value->default_date_time_nan_value, false)
+            __CREATE_NUMBER_VALUE_ARRAY (date_time_t, date_time_value_arrays, date_time_value_node_t, date_time_value_chain_heads, p_default_nan_value->default_date_time_nan_value, false)
         }
         else if (p_data_frame_info->value_types[value_idx] == BSON_TYPE_DOUBLE) {
             uint8_t float64_nan_value = 255;  // 4 "255"s in memory is float64 nan
-            __CREATE_NUMBER_VALUE_ARRAY(float64_t, float64_value_arrays, float64_value_node_t, float64_value_chain_heads, float64_nan_value, true)
+            __CREATE_NUMBER_VALUE_ARRAY (float64_t, float64_value_arrays, float64_value_node_t, float64_value_chain_heads, float64_nan_value, true)
         }
         else if (p_data_frame_info->value_types[value_idx] == BSON_TYPE_BOOL) {
-            __CREATE_NUMBER_VALUE_ARRAY(bool_t, bool_value_arrays, bool_value_node_t, bool_value_chain_heads, p_default_nan_value->default_bool_nan_value, false)
+            __CREATE_NUMBER_VALUE_ARRAY (bool_t, bool_value_arrays, bool_value_node_t, bool_value_chain_heads, p_default_nan_value->default_bool_nan_value, false)
         }
     }
 }
