@@ -1,13 +1,23 @@
-from cymongo import CyMongo, CyMongoClient
+try:
+    from cymongo import CyMongo, CyMongoClient
+except ImportError:
+    from .cymongo import CyMongo, CyMongoClient
+try:
+    from logger import with_logger
+except ImportError:
+    from .logger import with_logger
+try:
+    import psutil
+except ImportError:
+    psutil = None
 from pymongo import MongoClient
-from logger import with_logger
 import datetime
 import numpy as np
 import pandas as pd
 import time
 import unittest
-import psutil
 import os
+import pytz
 
 
 @with_logger
@@ -35,11 +45,12 @@ class CymongoTest(unittest.TestCase):
                                 'blog_updated': np.bool}
     default_nan_values = {'daily_visitor_cnt': default_int64_nan_value, 'fan_cnt': default_int64_nan_value,
                           'last_logged_date_time': default_date_time_nan_value, 'blog_updated': default_bool_value}
+    tzinfo = pytz.FixedOffset(0)
 
     def pymongo_find(self):
         self.logger.info('--------------------------------------- pymongo_find ---------------------------------------')
-        client = MongoClient(self.mongo_uri)
-        collection = client[self.db][self.collection]
+        client = MongoClient(self.mongo_uri, tz_aware=True, tzinfo=self.tzinfo)
+        collection = client.get_database()[self.collection]
         data = {name: [] for name in [self.index_name] + [self.column_name] + self.value_names}
         begin = time.time()
         cur = collection.find(self.pymongo_filter, projection=self.pymongo_projection)
@@ -88,8 +99,8 @@ class CymongoTest(unittest.TestCase):
 
     def cymongo_find_as_table(self):
         self.logger.info('----------------------------------- cymongo_find_as_table ----------------------------------')
-        client = CyMongoClient(self.mongo_uri, self.use_client_pool)
-        collection = client[self.db][self.collection]
+        client = CyMongoClient(self.mongo_uri, tz_aware=True, tzinfo=self.tzinfo, use_client_pool=self.use_client_pool)
+        collection = client.get_database()[self.collection]
         collection.set_nan_process_method(
                 self.keep_int_when_has_nan_value, self.default_int32_nan_value, self.default_int64_nan_value,
                 self.default_date_time_nan_value, self.default_bool_value)
@@ -108,8 +119,8 @@ class CymongoTest(unittest.TestCase):
 
     def cymongo_find_as_data_frame(self):
         self.logger.info('-------------------------------- cymongo_find_as_data_frame --------------------------------')
-        client = CyMongoClient(self.mongo_uri, self.use_client_pool)
-        collection = client[self.db][self.collection]
+        client = CyMongoClient(self.mongo_uri, tz_aware=True, tzinfo=self.tzinfo, use_client_pool=self.use_client_pool)
+        collection = client.get_database()[self.collection]
         collection.set_nan_process_method(
                 self.keep_int_when_has_nan_value, self.default_int32_nan_value, self.default_int64_nan_value,
                 self.default_date_time_nan_value, self.default_bool_value)
@@ -184,8 +195,9 @@ class CymongoTest(unittest.TestCase):
             for cnt in range(1, 10001):
                 self.run_test(self.test_mode[: -len('_memory_leak')])
                 print('test_memory_leak, run {} times finished.'.format(cnt))
-                print('memory used: {}, memory used percent: {}.'.format(psutil.Process(os.getpid()).memory_info().rss,
-                      psutil.virtual_memory().percent))
+                if psutil is not None:
+                    print('memory used: {}, memory used percent: {}.'.format(
+                          psutil.Process(os.getpid()).memory_info().rss, psutil.virtual_memory().percent))
 
     def test_find_slice_col(self):
         if self.test_mode == 'function':

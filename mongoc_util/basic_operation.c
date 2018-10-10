@@ -31,6 +31,7 @@
 #define _TRANSFER_DATE_TIME_FORMAT(DATE_TIME, NEW_DATE_TIME) \
     millisecond = DATE_TIME % 1000; \
     time = DATE_TIME / 1000; \
+    time += tz_offset_second; \
     struct tm *p_date_time = gmtime(&time); \
     year = p_date_time->tm_year + 1900; \
     month = p_date_time->tm_mon + 1; \

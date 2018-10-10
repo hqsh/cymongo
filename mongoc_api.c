@@ -88,7 +88,7 @@ mongoc_collection_t * get_collection (mongoc_client_t *client, const char *db_na
     return mongoc_client_get_collection (client, db_name, collection_name);
 }
 
-data_frame_data_t * find_as_data_frame (mongoc_collection_t *collection, default_nan_value_t* p_default_nan_value, data_frame_info_t *data_frame_info, const char *filter, const char *options, bool debug)
+data_frame_data_t * find_as_data_frame (mongoc_collection_t *collection, default_nan_value_t* p_default_nan_value, data_frame_info_t *data_frame_info, const char *filter, const char *options, int tz_offset_second, bool debug)
 {
     // mongodb variable
     mongoc_cursor_t *cursor;
@@ -184,7 +184,7 @@ data_frame_data_t * find_as_data_frame (mongoc_collection_t *collection, default
 }
 
 
-table_t * find_as_table (mongoc_collection_t *collection, default_nan_value_t* p_default_nan_value, table_info_t *p_table_info, const char *filter, const char *options, bool debug)
+table_t * find_as_table (mongoc_collection_t *collection, default_nan_value_t* p_default_nan_value, table_info_t *p_table_info, const char *filter, const char *options, int tz_offset_second, bool debug)
 {
     // mongodb variable
     mongoc_cursor_t *cursor;

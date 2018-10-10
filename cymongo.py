@@ -1,6 +1,12 @@
-from mongoc_api_define import *
+try:
+    from mongoc_api_define import *
+except ImportError:
+    from .mongoc_api_define import *
+try:
+    from logger import with_logger
+except ImportError:
+    from .logger import with_logger
 from collections import OrderedDict
-from logger import with_logger
 import numpy as np
 import pandas as pd
 import json
@@ -94,7 +100,14 @@ class CyMongo:
 
 
 class CyMongoClient(CyMongo):
-    def __init__(self, mongoc_uri, use_client_pool=True):
+    def __init__(self, mongoc_uri, tz_aware=False, tzinfo=None, use_client_pool=True):
+        if tz_aware and tzinfo:
+            try:
+                self.__tz_offset_second = c_int(tzinfo._minutes * 60)
+            except AttributeError:
+                self.__tz_offset_second = c_int(0)
+        else:
+            self.__tz_offset_second = c_int(0)
         try:
             at_idx = mongoc_uri.index('@')
         except ValueError:
@@ -105,6 +118,11 @@ class CyMongoClient(CyMongo):
             last_slash_idx += len(s) + 1
         if last_slash_idx > at_idx:
             mongoc_uri = mongoc_uri[: last_slash_idx]
+            self.__default_db_name = split_uri[-1]
+            if self.__default_db_name == '':
+                self.__default_db_name = None
+        else:
+            self.__default_db_name = None
         self.__mongoc_uri = self.to_bytes(mongoc_uri, 'mongoc_uri')
         if self.mongoc_uri_has_auth_source(mongoc_uri):
             self.__mongoc_client_pool, self.__mongoc_client = self.get_mongoc_client(self.__mongoc_uri)
@@ -117,6 +135,16 @@ class CyMongoClient(CyMongo):
     @property
     def is_closed(self):
         return self.__is_closed
+
+    @property
+    def tz_offset_second(self):
+        return self.__tz_offset_second
+
+    def get_database(self):
+        if self.__default_db_name is None:
+            raise CyMongoClientHasNoDefaultDatabaseNameException
+        return CyMongoDatabase(self.__default_db_name, self, self.__mongoc_client, self.__mongoc_uri,
+                               self.__mongoc_client_pool)
 
     def add_cymongo_db(self, cymongo_db):
         self.__cymongo_dbs.append(cymongo_db)
@@ -176,6 +204,10 @@ class CyMongoDatabase(CyMongo):
     @property
     def mongoc_db(self):
         return self.__mongoc_db
+
+    @property
+    def cymongo_client(self):
+        return self.__cymongo_client
 
     @property
     def cymongo_collections(self):
@@ -411,8 +443,8 @@ class CyMongoCollection(CyMongo):
             data_frame_data = None
             try:
                 data_frame_data = self.mongoc_api.find_as_data_frame(
-                        self.__mongoc_collection, pointer(self.__nan_process_method),
-                        pointer(self.__data_frame_info), filter, self.__options, self.__debug)
+                        self.__mongoc_collection, pointer(self.__nan_process_method), pointer(self.__data_frame_info),
+                        filter, self.__options, self.__cymongo_client.tz_offset_second, self.__debug)
                 if self.__debug:
                     self.logger.debug('get_data_from_c cost: {}'.format(time.time() - begin))
                 index = self.__get_index_or_column(data_frame_data, 'index')
@@ -445,8 +477,8 @@ class CyMongoCollection(CyMongo):
             elif isinstance(filter, str):
                 filter = self.to_bytes(filter, 'filter')
             c_table = self.mongoc_api.find_as_table(
-                    self.__mongoc_collection, pointer(self.__nan_process_method),
-                    pointer(self.__table_info), filter, self.__options, self.__debug)
+                    self.__mongoc_collection, pointer(self.__nan_process_method), pointer(self.__table_info),
+                    filter, self.__options, self.__cymongo_client.tz_offset_second, self.__debug)
             if self.__debug:
                 self.logger.debug('get_data_from_c cost: {}'.format(time.time() - begin))
             table = self.__get_table(c_table)
@@ -472,4 +504,10 @@ class CyMongoUriIllegalException(CyMongoException):
 class CyMongoClientIsClosedException(CyMongoException):
     def __init__(self, *args, **kwargs):
         self.message = 'Cannot support this operation, when the client is closed.'
+        self.args = (self.message, )
+
+
+class CyMongoClientHasNoDefaultDatabaseNameException(CyMongoException):
+    def __init__(self, *args, **kwargs):
+        self.message = 'No default database defined.'
         self.args = (self.message, )
