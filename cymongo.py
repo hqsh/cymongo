@@ -416,8 +416,9 @@ class CyMongoCollection(CyMongo):
         for idx in range(self.__table_info.column_cnt):
             dtype = self.bson_type_to_type(self.__table_info.column_types[idx])
             if dtype is None:
-                raise TypeError('Got unknown column type, maybe the connection to MongoDB lost or the column name is '
-                                'not correct.')
+                self.logger.warning('Got unknown column type, maybe the connection to MongoDB lost or the column name '
+                                    '"{}" is not correct.'.format(self.__column_names[idx]))
+                continue
             c_array = getattr(c_table.contents, '{}_columns'.format(dtype))[idx]
             if c_array:
                 if dtype == 'string':
