@@ -106,7 +106,7 @@ class CymongoTest(unittest.TestCase):
                 self.default_date_time_nan_value, self.default_bool_value)
         if self.enable_debug:
             collection.enable_debug()
-        collection.set_table_info([self.index_name] + [self.column_name] + self.value_names)
+        collection.set_table_info([self.index_name] + [self.column_name] + self.value_names, sort={self.index_name: 1})
         begin = time.time()
         table = collection.find(self.cymongo_filter, return_type='table')
         client.close()

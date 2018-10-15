@@ -308,7 +308,7 @@ class CyMongoCollection(CyMongo):
             c_uint(value_cnt)
         )
 
-    def set_table_info(self, column_names):
+    def set_table_info(self, column_names, sort=None):
         self.__column_names = list(column_names)
         if len(self.__column_names) == 0:
             raise ValueError('The count of elements in column_names cannot be 0.')
@@ -319,7 +319,10 @@ class CyMongoCollection(CyMongo):
             byte_column_names.append(self.to_bytes(column_name, 'element of column_names'))
             column_types.append(c_int(BSON_TYPE_UNKNOWN))
             projection[column_name] = True
-        self.__options = self.to_bytes(json.dumps({'projection': projection}), 'projection')
+        options = {'projection': projection}
+        if sort is not None:
+            options['sort'] = sort
+        self.__options = self.to_bytes(json.dumps(options), 'options')
         column_cnt = len(byte_column_names)
         c_char_p_array = c_char_p * column_cnt
         c_int_array = c_int * column_cnt
