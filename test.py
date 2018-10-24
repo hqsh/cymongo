@@ -111,10 +111,13 @@ class CymongoTest(unittest.TestCase):
         table = collection.find(self.cymongo_filter, return_type='table')
         client.close()
         self.logger.info('find as table by cymongo cost: {}'.format(time.time() - begin))
-        df = table.set_index(['date_time', 'blogger_id'])
-        self.logger.info('set_index cost: {}'.format(time.time() - begin))
-        df = df.unstack('blogger_id')
-        self.logger.info('unstack cost: {}'.format(time.time() - begin))
+        if table.size > 0:
+            df = table.set_index(['date_time', 'blogger_id'])
+            self.logger.info('set_index cost: {}'.format(time.time() - begin))
+            df = df.unstack('blogger_id')
+            self.logger.info('unstack cost: {}'.format(time.time() - begin))
+        else:
+            df = pd.DataFrame([])
         return table, df
 
     def cymongo_find_as_data_frame(self):
@@ -171,8 +174,10 @@ class CymongoTest(unittest.TestCase):
             pymongo_table, pymongo_df = None, None
         if test_memory_leak is None or test_memory_leak == 'table':
             cymongo_table, _ = self.cymongo_find_as_table()
+            self.logger.info(cymongo_table)
         if test_memory_leak is None or test_memory_leak == 'data_frame':
             cymongo_dfs = self.cymongo_find_as_data_frame()
+            self.logger.info(cymongo_dfs['heat_degree'])
         if test_memory_leak is None:
             self.assert_table_equal(pymongo_table, cymongo_table)
             for df_name, df in cymongo_dfs.items():
@@ -199,6 +204,14 @@ class CymongoTest(unittest.TestCase):
                     print('memory used: {}, memory used percent: {}.'.format(
                           psutil.Process(os.getpid()).memory_info().rss, psutil.virtual_memory().percent))
 
+    def test_find_all(self):
+        if self.test_mode == 'function':
+            self.logger.info('===================================== test_find_all ====================================')
+            self.pymongo_find_need_fillna_astype = False
+            self.collection = 'cymongo'
+            self.pymongo_filter = self.cymongo_filter = {}
+            self.run_test()
+
     def test_find_slice_col(self):
         if self.test_mode == 'function':
             self.logger.info('==================================== test_slice_col ====================================')
@@ -223,7 +236,7 @@ class CymongoTest(unittest.TestCase):
 
     def test_find_with_nan_value_keep_int(self):
         if self.test_mode == 'function':
-            self.logger.info('=============================== test_find_with_nan_value ===============================')
+            self.logger.info('=========================== test_find_with_nan_value_keep_int ==========================')
             self.pymongo_find_need_fillna_astype = True
             self.keep_int_when_has_nan_value = True
             self.collection = 'cymongo_nan'
@@ -231,8 +244,8 @@ class CymongoTest(unittest.TestCase):
             self.run_test()
 
     def test_find_with_nan_value_not_keep_int(self):
-        if self.test_mode == 'function':
-            self.logger.info('=============================== test_find_with_nan_value ===============================')
+        if self.test_mode == 'debug':
+            self.logger.info('========================= test_find_with_nan_value_not_keep_int ========================')
             self.pymongo_find_need_fillna_astype = True
             self.keep_int_when_has_nan_value = False
             self.collection = 'cymongo_nan'
@@ -241,5 +254,5 @@ class CymongoTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    # CymongoTest.test_mode = 'data_frame_memory_leak'
+    CymongoTest.test_mode = 'debug'
     unittest.main()

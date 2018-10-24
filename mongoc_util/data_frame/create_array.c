@@ -19,13 +19,15 @@
     if (BSON_TYPE == BSON_TYPE_UTF8) { \
         string_index_t *head; \
         if (IS_INDEX) { \
+            CNT = HASH_COUNT (P_MONGO_DATA->string_index_head); \
+            HASH_SORT (P_MONGO_DATA->string_index_head, string_index_sort); \
             head = P_MONGO_DATA->string_index_head; \
         } \
         else { \
+            CNT = HASH_COUNT (P_MONGO_DATA->string_column_head); \
+            HASH_SORT (P_MONGO_DATA->string_column_head, string_index_sort); \
             head = P_MONGO_DATA->string_column_head; \
         } \
-        CNT = HASH_COUNT (head); \
-        HASH_SORT (head, string_index_sort); \
         STRING_ARRAY = (bson_unichar_t *) malloc (sizeof(bson_unichar_t) * MAX_STRING_LENGTH * CNT); \
         memset (STRING_ARRAY, 0, sizeof(bson_unichar_t) * MAX_STRING_LENGTH * CNT); \
         uint64_t i = 0; \
