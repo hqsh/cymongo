@@ -175,6 +175,7 @@ class CyMongoClient(CyMongo):
                 self.mongoc_api.close_collection(cymongo_collection.mongoc_collection)
             self.mongoc_api.close_database(cymongo_db.mongoc_db)
         self.mongoc_api.close_client(self.__mongoc_client_pool, self.__mongoc_client)
+        self.mongoc_api.close_pool(self.__mongoc_client_pool)
         self.__mongoc_client_pool = None
         self.__mongoc_client = None
         gc.collect()

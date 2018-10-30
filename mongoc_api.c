@@ -11,30 +11,22 @@
 #include <time.h>
 
 
-mongoc_client_pool_t * get_pool (const char *mongoc_uri, int *error_code) {
-    mongoc_uri_t *uri;
-    mongoc_client_t *client;
-    bson_error_t error;
-    mongoc_init ();
-    uri = mongoc_uri_new_with_error (mongoc_uri, &error);
-    if (!uri) {
-        free (uri);
-        *error_code = ILLEGAL_MONGOC_URI_ERROR_CODE;
-        return NULL;
-    }
-    mongoc_client_pool_t *p_mongoc_client_pool = mongoc_client_pool_new (uri);
-    free (uri);
-    return p_mongoc_client_pool;
+void close_pool (mongoc_client_pool_t *pool)
+{
+    mongoc_client_pool_destroy (pool);
+    mongoc_cleanup ();
 }
 
 
 void close_client (mongoc_client_pool_t *pool, mongoc_client_t *client)
 {
-    if (pool != NULL) {
+    if (pool == NULL) {
+        mongoc_client_destroy (client);
+        mongoc_cleanup ();
+    }
+    else {
         mongoc_client_pool_push (pool, client);
     }
-    mongoc_client_destroy (client);
-    mongoc_cleanup();
 }
 
 
@@ -47,6 +39,23 @@ void close_database (mongoc_database_t *database)
 void close_collection (mongoc_collection_t *collection)
 {
     mongoc_collection_destroy (collection);
+}
+
+
+mongoc_client_pool_t * get_pool (const char *mongoc_uri, int *error_code)
+{
+    mongoc_uri_t *uri;
+    bson_error_t error;
+    mongoc_init ();
+    uri = mongoc_uri_new_with_error (mongoc_uri, &error);
+    if (!uri) {
+        free (uri);
+        *error_code = ILLEGAL_MONGOC_URI_ERROR_CODE;
+        return NULL;
+    }
+    mongoc_client_pool_t *p_mongoc_client_pool = mongoc_client_pool_new (uri);
+    free (uri);
+    return p_mongoc_client_pool;
 }
 
 
@@ -76,6 +85,7 @@ mongoc_client_t * get_client (const char *mongoc_uri, mongoc_client_pool_t *pool
     *error_code = EXIT_SUCCESS;
     return client;
 }
+
 
 mongoc_database_t * get_database (mongoc_client_t *client, const char *db_name)
 {

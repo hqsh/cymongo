@@ -174,10 +174,8 @@ class CymongoTest(unittest.TestCase):
             pymongo_table, pymongo_df = None, None
         if test_memory_leak is None or test_memory_leak == 'table':
             cymongo_table, _ = self.cymongo_find_as_table()
-            self.logger.info(cymongo_table)
         if test_memory_leak is None or test_memory_leak == 'data_frame':
             cymongo_dfs = self.cymongo_find_as_data_frame()
-            self.logger.info(cymongo_dfs['heat_degree'])
         if test_memory_leak is None:
             self.assert_table_equal(pymongo_table, cymongo_table)
             for df_name, df in cymongo_dfs.items():
@@ -244,7 +242,7 @@ class CymongoTest(unittest.TestCase):
             self.run_test()
 
     def test_find_with_nan_value_not_keep_int(self):
-        if self.test_mode == 'debug':
+        if self.test_mode == 'function':
             self.logger.info('========================= test_find_with_nan_value_not_keep_int ========================')
             self.pymongo_find_need_fillna_astype = True
             self.keep_int_when_has_nan_value = False
@@ -254,5 +252,5 @@ class CymongoTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
-    CymongoTest.test_mode = 'debug'
+    # CymongoTest.test_mode = 'data_frame_memory_leak'
     unittest.main()
