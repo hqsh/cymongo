@@ -282,6 +282,8 @@ class CyMongoCollection(CyMongo):
         self.__index_key = index_key
         self.__column_key = column_key
         self.__value_keys = list(value_keys)
+        if self.__index_key in self.__value_keys or self.__column_key in self.__value_keys:
+            raise ValueError('index_key or column_key cannot in value_keys.')
         if len(self.__value_keys) == 0:
             raise ValueError('The count of elements in value_keys cannot be 0.')
         projection = OrderedDict()
