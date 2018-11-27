@@ -100,7 +100,7 @@ class CyMongo:
 
 
 class CyMongoClient(CyMongo):
-    def __init__(self, mongoc_uri, tz_aware=False, tzinfo=None, use_client_pool=True):
+    def __init__(self, mongoc_uri, tz_aware=False, tzinfo=None, use_client_pool=True, max_pool_size=3):
         if tz_aware and tzinfo:
             try:
                 self.__tz_offset_second = c_int(tzinfo._minutes * 60)
@@ -129,6 +129,7 @@ class CyMongoClient(CyMongo):
         else:
             self.__mongoc_client_pool, self.__mongoc_client = None, None
         self.__use_client_pool = use_client_pool
+        self.__max_pool_size = c_uint32(max_pool_size)
         self.__cymongo_dbs = []
         self.__is_closed = False
 
@@ -160,7 +161,7 @@ class CyMongoClient(CyMongo):
         mongoc_uri = self.to_bytes(mongoc_uri, 'mongoc_uri')
         error_code = c_int()
         if self.__use_client_pool and self.__mongoc_client_pool is None:
-            self.__mongoc_client_pool = self.mongoc_api.get_pool(mongoc_uri, byref(error_code))
+            self.__mongoc_client_pool = self.mongoc_api.get_pool(mongoc_uri, byref(error_code), self.__max_pool_size)
             self.__check_error_code(error_code.value)
         self.__mongoc_client = self.mongoc_api.get_client(mongoc_uri, self.__mongoc_client_pool, byref(error_code))
         self.__check_error_code(error_code.value)
@@ -440,7 +441,6 @@ class CyMongoCollection(CyMongo):
 
     def find(self, filter=None, return_type='table'):
         if self.__debug:
-            import time
             begin = time.time()
         if return_type == 'data_frame':
             if isinstance(filter, dict):

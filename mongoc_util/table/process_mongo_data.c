@@ -30,7 +30,7 @@ node_chain_heads_t * init_node_chain_heads_t (unsigned int column_cnt)
     if (bson_type == BSON_TYPE_UTF8) { \
         string_data = bson_iter_utf8 (&ITER, &length); \
         p_string_node = (string_node_t *) malloc (sizeof(string_node_t)); \
-        _CHAR_STRING_TO_UNI_CHAR_STRING(string_data, p_string_node->data.string, p_string_node->data.length) \
+        _CHAR_STRING_TO_UNI_CHAR_STRING (string_data, p_string_node->data.string, p_string_node->data.length) \
         p_string_node->idx = IDX; \
         if (p_table->string_column_max_lengths[COLUMN_IDX] < p_string_node->data.length) { \
             p_table->string_column_max_lengths[COLUMN_IDX] = p_string_node->data.length; \

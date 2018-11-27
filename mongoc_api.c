@@ -42,7 +42,7 @@ void close_collection (mongoc_collection_t *collection)
 }
 
 
-mongoc_client_pool_t * get_pool (const char *mongoc_uri, int *error_code)
+mongoc_client_pool_t * get_pool (const char *mongoc_uri, int *error_code, uint32_t max_pool_size)
 {
     mongoc_uri_t *uri;
     bson_error_t error;
@@ -54,6 +54,7 @@ mongoc_client_pool_t * get_pool (const char *mongoc_uri, int *error_code)
         return NULL;
     }
     mongoc_client_pool_t *p_mongoc_client_pool = mongoc_client_pool_new (uri);
+    mongoc_client_pool_max_size (p_mongoc_client_pool, max_pool_size);
     free (uri);
     return p_mongoc_client_pool;
 }
