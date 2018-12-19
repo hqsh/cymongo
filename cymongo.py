@@ -442,11 +442,11 @@ class CyMongoCollection(CyMongo):
     def find(self, filter=None, return_type='table'):
         if self.__debug:
             begin = time.time()
+        if isinstance(filter, dict):
+            filter = json.dumps(filter)
+        if isinstance(filter, str):
+            filter = self.to_bytes(filter, 'filter')
         if return_type == 'data_frame':
-            if isinstance(filter, dict):
-                filter = self.to_bytes(json.dumps(filter), 'filter')
-            elif isinstance(filter, str):
-                filter = self.to_bytes(filter, 'filter')
             data_frame_data = None
             try:
                 data_frame_data = self.mongoc_api.find_as_data_frame(
@@ -479,10 +479,6 @@ class CyMongoCollection(CyMongo):
                     self.logger.debug('create dfs cost: {}'.format(time.time() - begin))
             return dfs
         if return_type == 'table':
-            if isinstance(filter, dict):
-                filter = self.to_bytes(json.dumps(filter), 'filter')
-            elif isinstance(filter, str):
-                filter = self.to_bytes(filter, 'filter')
             c_table = self.mongoc_api.find_as_table(
                     self.__mongoc_collection, pointer(self.__nan_process_method), pointer(self.__table_info),
                     filter, self.__options, self.__cymongo_client.tz_offset_second, self.__debug)
