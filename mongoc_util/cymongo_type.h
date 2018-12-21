@@ -23,7 +23,7 @@ typedef struct {
     bool_t default_bool_nan_value;
 } default_nan_value_t;
 
-// ------------------------------ [start] data structure from mongo [start] ------------------------------
+// ------------- [start] data structure from mongo when return_type is "data_frame" [start] -------------
 // the data and information of index or columns of DataFrame
 typedef struct {
     const char *key;       // char string, hash key, for faster search in hash table
@@ -105,7 +105,7 @@ typedef struct _bool_value_node_t {
     uint64_t *p_column_idx;
 } bool_value_node_t;
 
-// the data from mongo
+// data structure from mongo when return_type is "data_frame"
 typedef struct {
     // index
     uint64_t string_index_max_length;     // max length of index strings if index is string type
@@ -131,9 +131,10 @@ typedef struct {
     float64_value_node_t **float64_value_chain_heads;
     bool_value_node_t **bool_value_chain_heads;
 } mongo_data_t;
-// -------------------------------- [end] data structure from mongo [end] -------------------------------
+// --------------- [end] data structure from mongo when return_type is "data_frame" [end] ---------------
 
-// ------------------------------ [start] data structure to python [start] ------------------------------
+// ------------- [start] data structure to python, when return_type is "data_frame" [start] -------------
+// the description of DataFrame when return_type is "data_frame", it is initiated by python, and modified by C
 typedef struct {
     char *index_key;
     int index_type;
@@ -151,6 +152,7 @@ typedef struct _data_frame_string_value_t {
     struct _data_frame_string_value_t *next;
 } data_frame_string_value_t;
 
+// the return structure by C when return_type is "data_frame"
 typedef struct {
     // shape
     uint64_t row_cnt;
@@ -180,10 +182,11 @@ typedef struct {
     float64_t **float64_value_arrays;
     bool_t **bool_value_arrays;
 } data_frame_data_t;
-// -------------------------------- [end] data structure to python [end] --------------------------------
+// --------------- [end] data structure to python, when return_type is "data_frame" [end] ---------------
 
 
-// ------------------------------ [start] data structure for table [start] ------------------------------
+// --------------------- [start] data structure when return_type is "table" [start] ---------------------
+// the description of DataFrame when return_type is "table", it is initiated by python, and modified by C
 typedef struct {
     char **column_names;
     int *column_types;
@@ -226,6 +229,7 @@ typedef struct _bool_node_t {
     struct _bool_node_t *next;
 } bool_node_t;
 
+// the structure when load data from mongo and return_type is "table"
 typedef struct {
     string_node_t **string_node_chain_heads;
     int32_node_t **int32_node_chain_heads;
@@ -235,6 +239,7 @@ typedef struct {
     bool_node_t **bool_node_chain_heads;
 } node_chain_heads_t;
 
+// the return structure by C when return_type is "table"
 typedef struct {
     uint64_t row_cnt;
     uint64_t *string_column_max_lengths;
@@ -245,6 +250,6 @@ typedef struct {
     float64_t **float64_columns;
     bool_t **bool_columns;
 } table_t;
-// -------------------------------- [end] data structure for table [end] --------------------------------
+// ----------------------- [end] data structure when return_type is "table" [end] -----------------------
 
 #endif
