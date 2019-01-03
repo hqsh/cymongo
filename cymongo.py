@@ -239,6 +239,22 @@ class CyMongoCollection(CyMongo):
     __default_date_time_nan_value = 0
     __default_bool_value = False
 
+    @property
+    def default_int32_nan_value(self):
+        return self.__default_int32_nan_value
+
+    @property
+    def default_int64_nan_value(self):
+        return self.__default_int64_nan_value
+
+    @property
+    def default_date_time_nan_value(self):
+        return self.__default_date_time_nan_value
+
+    @property
+    def default_bool_value(self):
+        return self.__default_bool_value
+
     def __init__(self, cymongo_db, cymongo_client, mongoc_client, db_name, collection_name, mongoc_client_pool=None):
         self.__cymongo_client = cymongo_client
         self.__mongoc_client = mongoc_client
@@ -471,7 +487,7 @@ class CyMongoCollection(CyMongo):
                 for value_key, value in values.items():
                     dfs[value_key] = pd.DataFrame(value, index=index, columns=column)
             except:
-                dfs = None
+                dfs = OrderedDict()
             finally:
                 if data_frame_data is not None:
                     self.mongoc_api.free_data_frame_memory(data_frame_data, c_uint(len(self.__value_keys)))
@@ -508,9 +524,11 @@ class CyMongoClientIsClosedException(CyMongoException):
     def __init__(self, *args, **kwargs):
         self.message = 'Cannot support this operation, when the client is closed.'
         self.args = (self.message, )
+        super().__init__(args, kwargs)
 
 
 class CyMongoClientHasNoDefaultDatabaseNameException(CyMongoException):
     def __init__(self, *args, **kwargs):
         self.message = 'No default database defined.'
         self.args = (self.message, )
+        super().__init__(args, kwargs)
